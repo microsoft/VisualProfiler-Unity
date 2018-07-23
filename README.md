@@ -16,7 +16,7 @@ The Visual Profiler is targeted towards profiling 3D UWP Unity applications, and
 ## Installation
 Clone, or download, VisualProfiler.cs and place it anywhere within the Assets folder of your Unity project. 
 
-Next add the VisualProfiler component to any gameobject in the Unity scene you wish to profile. The profiler is initially disabled (toggle-able via the initiallyActive property), but can be toggled via the enabled/disable voice commands keywords.
+Next, add the VisualProfiler component to any gameobject in the Unity scene you wish to profile. The profiler is initially disabled (toggle-able via the initiallyActive property), but can be toggled via the enabled/disable voice command keywords.
 
 IMPORTANT: Please make sure to add the microphone capability to your app if you plan on using the enable/disable keywords, in Unity under Edit -> Project Settings -> Player -> Settings for Windows Store -> Publishing Settings -> Capabilities or in your Visual Studio Package.appxmanifest capabilities.
 

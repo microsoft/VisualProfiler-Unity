@@ -8,7 +8,7 @@ using UnityEngine.Windows.Speech;
 using UnityEngine.Profiling;
 #endif
 
-namespace VisualProfiler
+namespace Microsoft.MixedReality.Profiling
 {
     /// <summary>
     /// ABOUT: The VisualProfiler provides a drop in, single file, solution for viewing 
