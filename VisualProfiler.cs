@@ -3,6 +3,8 @@
 
 using UnityEngine;
 using UnityEngine.Windows.Speech;
+using System.Text;
+using System.Diagnostics;
 
 #if UNITY_5_5_OR_NEWER
 using UnityEngine.Profiling;
@@ -12,13 +14,13 @@ namespace Microsoft.MixedReality.Profiling
 {
     /// <summary>
     /// ABOUT: The VisualProfiler provides a drop in, single file, solution for viewing 
-    /// your Windows Mixed Reality Unity application's frame rate and memory usage. Dropped 
+    /// your Windows Mixed Reality Unity application's frame rate and memory usage. Missed 
     /// frames are displayed over time to visually find problem areas. Memory is reported 
     /// as current, peak and max usage in a bar graph. 
     /// 
     /// USAGE: To use this profiler simply add this script as a component of any gameobject in 
     /// your Unity scene. The profiler is initially disabled (toggle-able via the initiallyActive 
-    /// property) but can be toggled via the enabled/disable voice commands keywords.
+    /// property), but can be toggled via the enabled/disable voice commands keywords.
     ///
     /// IMPORTANT: Please make sure to add the microphone capability to your app if you plan 
     /// on using the enable/disable keywords, in Unity under Edit -> Project Settings -> 
@@ -93,7 +95,7 @@ namespace Microsoft.MixedReality.Profiling
         private FrameInfo[] frameInfo;
         private int frameOffset;
         private int frameCount;
-        private float deltaTimeAccumulation;
+        private Stopwatch stopwatch = new Stopwatch();
         private string[] frameRateStrings;
 
         private ulong memoryUsage;
@@ -104,6 +106,8 @@ namespace Microsoft.MixedReality.Profiling
         private MaterialPropertyBlock propertyBlockFrameMissed;
 
         private KeywordRecognizer keywordRecognizer;
+
+        private StringBuilder stringBuilder = new StringBuilder(32);
 
         [SerializeField]
         [HideInInspector]
@@ -134,6 +138,8 @@ namespace Microsoft.MixedReality.Profiling
                 textMaterial.renderQueue = defaultMaterial.renderQueue;
                 Destroy(meshRenderer.gameObject);
             }
+
+            stopwatch.Restart();
         }
 
         private void Start()
@@ -176,14 +182,13 @@ namespace Microsoft.MixedReality.Profiling
                 window.transform.rotation = Quaternion.Slerp(window.transform.rotation, rotation, t);
             }
 
-            // Accumulate the delta time.
             ++frameCount;
-            deltaTimeAccumulation += Time.unscaledDeltaTime;
+            float elapsedSeconds = stopwatch.ElapsedMilliseconds * 0.001f;
 
-            if (deltaTimeAccumulation >= frameSampleRate)
+            if (elapsedSeconds >= frameSampleRate)
             {
                 // Update frame rate text.
-                int frameRate = (int)(1.0f / (deltaTimeAccumulation / frameCount));
+                int frameRate = (int)(1.0f / (elapsedSeconds / frameCount));
                 frameRateText.text = frameRateStrings[Mathf.Clamp(frameRate, 0, maxTargetFrameRate)];
 
                 // Update frame colors.
@@ -197,7 +202,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 frameOffset = (frameOffset + 1) % frameRange;
                 frameCount = 0;
-                deltaTimeAccumulation = 0.0f;
+                stopwatch.Restart();
             }
 
             // Update memory statistics.
@@ -209,7 +214,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (window.activeSelf)
                 {
-                    MemoryUsageToString(limitMemoryText, limitMemoryString, limitMemoryUsage);
+                    MemoryUsageToString(stringBuilder, limitMemoryText, limitMemoryString, limitMemoryUsage);
                 }
             }
 
@@ -222,7 +227,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (window.activeSelf)
                 {
-                    MemoryUsageToString(usedMemoryText, usedMemoryString, memoryUsage);
+                    MemoryUsageToString(stringBuilder, usedMemoryText, usedMemoryString, memoryUsage);
                 }
             }
 
@@ -233,7 +238,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (window.activeSelf)
                 {
-                    MemoryUsageToString(peakMemoryText, peakMemoryString, peakMemoryUsage);
+                    MemoryUsageToString(stringBuilder, peakMemoryText, peakMemoryString, peakMemoryUsage);
                 }
             }
         }
@@ -315,10 +320,17 @@ namespace Microsoft.MixedReality.Profiling
         {
             frameRateStrings = new string[maxTargetFrameRate + 1];
 
+            StringBuilder milisecondStringBuilder = new StringBuilder(16);
+            stringBuilder.Clear();
+
             for (int i = 0; i < frameRateStrings.Length; ++i)
             {
                 float miliseconds = (i == 0) ? 0.0f : (1.0f / i) * 1000.0f;
-                frameRateStrings[i] = string.Format("{0} fps ({1} ms)", i.ToString(), string.Format("{0:F1}", miliseconds));
+                milisecondStringBuilder.AppendFormat("{0:F1}", miliseconds);
+                stringBuilder.AppendFormat("{0} fps ({1} ms)", i.ToString(), milisecondStringBuilder.ToString());
+                frameRateStrings[i] = stringBuilder.ToString();
+                milisecondStringBuilder.Clear();
+                stringBuilder.Clear();
             }
         }
 
@@ -343,9 +355,9 @@ namespace Microsoft.MixedReality.Profiling
                     window.SetActive(true);
 
                     // Force refresh of strings.
-                    MemoryUsageToString(limitMemoryText, limitMemoryString, limitMemoryUsage);
-                    MemoryUsageToString(usedMemoryText, usedMemoryString, memoryUsage);
-                    MemoryUsageToString(peakMemoryText, peakMemoryString, peakMemoryUsage);
+                    MemoryUsageToString(stringBuilder, limitMemoryText, limitMemoryString, limitMemoryUsage);
+                    MemoryUsageToString(stringBuilder, usedMemoryText, usedMemoryString, memoryUsage);
+                    MemoryUsageToString(stringBuilder, peakMemoryText, peakMemoryString, peakMemoryUsage);
                 }
             }
         }
@@ -427,11 +439,13 @@ namespace Microsoft.MixedReality.Profiling
 #endif
         }
 
-        private static void MemoryUsageToString(TextMesh textMesh, string memoryString, ulong memoryUsage)
+        private static void MemoryUsageToString(StringBuilder stringBuilder, TextMesh textMesh, string memoryString, ulong memoryUsage)
         {
+            stringBuilder.Clear();
             // $TODO(thmicka): something faster than float to string?
-            string megabytes = string.Format("{0:F1}", ConvertBytesToMegabytes(memoryUsage));
-            textMesh.text = string.Format(memoryString, megabytes);
+            string megabytes = stringBuilder.AppendFormat("{0:F1}", ConvertBytesToMegabytes(memoryUsage)).ToString();
+            stringBuilder.Clear();
+            textMesh.text = stringBuilder.AppendFormat(memoryString, megabytes).ToString();
         }
 
         private static float AppFrameRate
