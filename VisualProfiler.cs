@@ -143,7 +143,8 @@ namespace Microsoft.MixedReality.Profiling
                 Destroy(meshRenderer.gameObject);
             }
 
-            stopwatch.Restart();
+            stopwatch.Reset();
+            stopwatch.Start();
         }
 
         private void Start()
@@ -206,7 +207,8 @@ namespace Microsoft.MixedReality.Profiling
 
                 frameOffset = (frameOffset + 1) % frameRange;
                 frameCount = 0;
-                stopwatch.Restart();
+                stopwatch.Reset();
+                stopwatch.Start();
             }
 
             // Update memory statistics.
@@ -328,7 +330,7 @@ namespace Microsoft.MixedReality.Profiling
             displayedDecimalFormat = string.Format("{{0:F{0}}}", displayedDecimalDigits);
 
             StringBuilder milisecondStringBuilder = new StringBuilder(16);
-            stringBuilder.Clear();
+            stringBuilder.Length = 0;
 
             for (int i = 0; i < frameRateStrings.Length; ++i)
             {
@@ -336,8 +338,8 @@ namespace Microsoft.MixedReality.Profiling
                 milisecondStringBuilder.AppendFormat(displayedDecimalFormat, miliseconds);
                 stringBuilder.AppendFormat("{0} fps ({1} ms)", i.ToString(), milisecondStringBuilder.ToString());
                 frameRateStrings[i] = stringBuilder.ToString();
-                milisecondStringBuilder.Clear();
-                stringBuilder.Clear();
+                milisecondStringBuilder.Length = 0;
+                stringBuilder.Length = 0;
             }
         }
 
@@ -448,10 +450,10 @@ namespace Microsoft.MixedReality.Profiling
 
         private static void MemoryUsageToString(StringBuilder stringBuilder, string displayedDecimalFormat, TextMesh textMesh, string memoryString, ulong memoryUsage)
         {
-            stringBuilder.Clear();
+            stringBuilder.Length = 0;
             // Note, this can trigger an allocation and can be called each frame. But, with default settings this function should only fire with memory deltas of +-1KB.
             string megabytes = stringBuilder.AppendFormat(displayedDecimalFormat, ConvertBytesToMegabytes(memoryUsage)).ToString();
-            stringBuilder.Clear();
+            stringBuilder.Length = 0;
             textMesh.text = stringBuilder.AppendFormat(memoryString, megabytes).ToString();
         }
 
