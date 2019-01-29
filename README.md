@@ -4,7 +4,7 @@ The VisualProfiler provides a drop in, single file, solution for viewing your Wi
 
 <img src="External/Images/ProfilerScreenshot.png" alt="drawing" width="500px">
 
-Dropped frames are displayed over time to visually find problem areas. Memory is reported as current, peak and max usage in a bar graph.
+Missed frames are displayed over time to visually find problem areas. Memory is reported as current, peak and max usage in a bar graph.
 
 The Visual Profiler is targeted towards profiling 3D UWP Unity applications, and has been verified to work on the following platforms:
 
@@ -22,7 +22,7 @@ IMPORTANT: Please make sure to add the microphone capability to your app if you 
 
 ## Usage
 
-When using the profiler look for "dropped frames" which appear as orange bars. Dropped frames indicate your application is not hitting its target frame rate and may need optimization work.
+When using the profiler look for "missed frames" which appear as orange bars. Missed frames indicate your application is not hitting its target frame rate and may need optimization work.
 
 <img src="External/Images/ProfilerGuide.png" alt="drawing" width="500px">
 
