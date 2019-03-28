@@ -19,7 +19,7 @@ namespace Microsoft.MixedReality.Profiling
     /// as current, peak and max usage in a bar graph. 
     /// 
     /// USAGE: To use this profiler simply add this script as a component of any gameobject in 
-    /// your Unity scene. The profiler is initially disabled (toggle-able via the initiallyActive 
+    /// your Unity scene. The profiler is initially enabled (toggle-able via the initiallyActive 
     /// property), but can be toggled via the enabled/disable voice commands keywords.
     ///
     /// IMPORTANT: Please make sure to add the microphone capability to your app if you plan 
@@ -33,34 +33,26 @@ namespace Microsoft.MixedReality.Profiling
 
         [Header("Profiler Settings")]
         [SerializeField]
-        private bool initiallyActive = false;
+        private bool initiallyActive = true;
         [SerializeField]
-        private string[] toggleKeyworlds = new string[]
-        {
-            "Profiler",
-            "Toggle Profiler",
-            "Show Profiler",
-            "Hide Profiler"
-        };
-        [SerializeField]
-        [Range(1, 60)]
+        private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
+        [SerializeField, Range(1, 60)]
         private int frameRange = 30;
-        [SerializeField]
-        [Range(0.0f, 1.0f)]
+        [SerializeField, Range(0.0f, 1.0f)]
         private float frameSampleRate = 0.1f;
 
-        [Header("UI Settings")]
+        [Header("Window Settings")]
         [SerializeField]
-        [Range(0.0f, 100.0f)]
-        private float windowFollowSpeed = 5.0f;
+        private TextAnchor windowAnchor = TextAnchor.LowerCenter;
         [SerializeField]
-        [Range(0.0f, 360.0f)]
-        private float windowYawRotation = 20.0f;
-        [SerializeField]
-        [Range(0.5f, 5.0f)]
+        private Vector2 windowOffset = new Vector2(0.075f, 0.1f);
+        [SerializeField, Range(0.5f, 5.0f)]
         private float windowScale = 1.0f;
-        [SerializeField]
-        [Range(0, 3)]
+        [SerializeField, Range(0.0f, 100.0f)]
+        private float windowFollowSpeed = 5.0f;
+
+        [Header("UI Settings")]
+        [SerializeField, Range(0, 3)]
         private int displayedDecimalDigits = 1;
         [SerializeField]
         private string usedMemoryString = "Used: {0}MB";
@@ -68,8 +60,6 @@ namespace Microsoft.MixedReality.Profiling
         private string peakMemoryString = "Peak: {0}MB";
         [SerializeField]
         private string limitMemoryString = "Limit: {0}MB";
-
-        [Header("UI Colors Settings")]
         [SerializeField]
         private Color baseColor = new Color(80 / 256.0f, 80 / 256.0f, 80 / 256.0f, 1.0f);
         [SerializeField]
@@ -90,7 +80,10 @@ namespace Microsoft.MixedReality.Profiling
         private TextMesh limitMemoryText;
         private Transform usedAnchor;
         private Transform peakAnchor;
-        private Quaternion windowRotation;
+        private Quaternion windowHorizontalRotation;
+        private Quaternion windowHorizontalRotationInverse;
+        private Quaternion windowVerticalRotation;
+        private Quaternion windowVerticalRotationInverse;
 
         private class FrameInfo
         {
@@ -123,6 +116,7 @@ namespace Microsoft.MixedReality.Profiling
         private Material foregroundMaterial;
         private Material textMaterial;
 
+        private static readonly Vector2 defaultWindowRotation = new Vector2(10.0f, 20.0f);
         private static readonly Vector3 defaultWindowScale = new Vector3(0.2f, 0.04f, 1.0f);
 
         private void Reset()
@@ -177,19 +171,14 @@ namespace Microsoft.MixedReality.Profiling
                 return;
             }
 
-            // Update window position.
+            // Update window transformation.
             Transform cameraTransform = Camera.main ? Camera.main.transform : null;
 
             if (window.activeSelf && cameraTransform != null)
             {
-                float windowDistance = Mathf.Max(16.0f / Camera.main.fieldOfView, Camera.main.nearClipPlane + 0.2f);
-                Vector3 position = cameraTransform.position + (cameraTransform.forward * windowDistance);
-                position -= cameraTransform.up * 0.1f;
-                Quaternion rotation = cameraTransform.rotation * windowRotation;
-
                 float t = Time.deltaTime * windowFollowSpeed;
-                window.transform.position = Vector3.Lerp(window.transform.position, position, t);
-                window.transform.rotation = Quaternion.Slerp(window.transform.rotation, rotation, t);
+                window.transform.position = Vector3.Lerp(window.transform.position, CalculateWindowPosition(cameraTransform), t);
+                window.transform.rotation = Quaternion.Slerp(window.transform.rotation, CalculateWindowRotation(cameraTransform), t);
                 window.transform.localScale = defaultWindowScale * windowScale;
             }
 
@@ -257,6 +246,47 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
+        private Vector3 CalculateWindowPosition(Transform cameraTransform)
+        {
+            float windowDistance = Mathf.Max(16.0f / Camera.main.fieldOfView, Camera.main.nearClipPlane + 0.2f);
+            Vector3 position = cameraTransform.position + (cameraTransform.forward * windowDistance);
+            Vector3 horizontalOffset = cameraTransform.right * windowOffset.x;
+            Vector3 verticalOffset = cameraTransform.up * windowOffset.y;
+
+            switch (windowAnchor)
+            {
+                case TextAnchor.UpperLeft: position += verticalOffset - horizontalOffset; break;
+                case TextAnchor.UpperCenter: position += verticalOffset; break;
+                case TextAnchor.UpperRight: position += verticalOffset + horizontalOffset; break;
+                case TextAnchor.MiddleLeft: position -= horizontalOffset; break;
+                case TextAnchor.MiddleRight: position += horizontalOffset; break;
+                case TextAnchor.LowerLeft: position -= verticalOffset + horizontalOffset; break;
+                case TextAnchor.LowerCenter: position -= verticalOffset; break;
+                case TextAnchor.LowerRight: position -= verticalOffset - horizontalOffset; break;
+            }
+
+            return position;
+        }
+
+        private Quaternion CalculateWindowRotation(Transform cameraTransform)
+        {
+            Quaternion rotation = cameraTransform.rotation;
+
+            switch (windowAnchor)
+            {
+                case TextAnchor.UpperLeft: rotation *= windowHorizontalRotationInverse * windowVerticalRotationInverse; break;
+                case TextAnchor.UpperCenter: rotation *= windowHorizontalRotationInverse; break;
+                case TextAnchor.UpperRight: rotation *= windowHorizontalRotationInverse * windowVerticalRotation; break;
+                case TextAnchor.MiddleLeft: rotation *= windowVerticalRotationInverse; break;
+                case TextAnchor.MiddleRight: rotation *= windowVerticalRotation; break;
+                case TextAnchor.LowerLeft: rotation *= windowHorizontalRotation * windowVerticalRotationInverse; break;
+                case TextAnchor.LowerCenter: rotation *= windowHorizontalRotation; break;
+                case TextAnchor.LowerRight: rotation *= windowHorizontalRotation * windowVerticalRotation; break;
+            }
+
+            return rotation;
+        }
+
         private void BuildWindow()
         {
             // Initialize property block state.
@@ -271,7 +301,10 @@ namespace Microsoft.MixedReality.Profiling
                 window = CreateQuad("VisualProfiler", null);
                 InitializeRenderer(window, backgroundMaterial, colorID, baseColor);
                 window.transform.localScale = defaultWindowScale;
-                windowRotation = Quaternion.AngleAxis(windowYawRotation, Vector3.right);
+                windowHorizontalRotation = Quaternion.AngleAxis(defaultWindowRotation.y, Vector3.right);
+                windowHorizontalRotationInverse = Quaternion.Inverse(windowHorizontalRotation);
+                windowVerticalRotation = Quaternion.AngleAxis(defaultWindowRotation.x, Vector3.up);
+                windowVerticalRotationInverse = Quaternion.Inverse(windowVerticalRotation);
             }
 
             // Add frame rate text and frame indicators.
