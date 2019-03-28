@@ -57,6 +57,9 @@ namespace Microsoft.MixedReality.Profiling
         [Range(0.0f, 360.0f)]
         private float windowYawRotation = 20.0f;
         [SerializeField]
+        [Range(0.5f, 5.0f)]
+        private float windowScale = 1.0f;
+        [SerializeField]
         [Range(0, 3)]
         private int displayedDecimalDigits = 1;
         [SerializeField]
@@ -119,6 +122,8 @@ namespace Microsoft.MixedReality.Profiling
         private Material backgroundMaterial;
         private Material foregroundMaterial;
         private Material textMaterial;
+
+        private static readonly Vector3 defaultWindowScale = new Vector3(0.2f, 0.04f, 1.0f);
 
         private void Reset()
         {
@@ -185,6 +190,7 @@ namespace Microsoft.MixedReality.Profiling
                 float t = Time.deltaTime * windowFollowSpeed;
                 window.transform.position = Vector3.Lerp(window.transform.position, position, t);
                 window.transform.rotation = Quaternion.Slerp(window.transform.rotation, rotation, t);
+                window.transform.localScale = defaultWindowScale * windowScale;
             }
 
             ++frameCount;
@@ -264,7 +270,7 @@ namespace Microsoft.MixedReality.Profiling
             {
                 window = CreateQuad("VisualProfiler", null);
                 InitializeRenderer(window, backgroundMaterial, colorID, baseColor);
-                window.transform.localScale = new Vector3(0.2f, 0.04f, 1.0f);
+                window.transform.localScale = defaultWindowScale;
                 windowRotation = Quaternion.AngleAxis(windowYawRotation, Vector3.right);
             }
 
