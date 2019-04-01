@@ -4,11 +4,7 @@
 using UnityEngine;
 using UnityEngine.Windows.Speech;
 using System.Text;
-using System.Diagnostics;
-
-#if UNITY_5_5_OR_NEWER
 using UnityEngine.Profiling;
-#endif
 
 namespace Microsoft.MixedReality.Profiling
 {
@@ -29,8 +25,6 @@ namespace Microsoft.MixedReality.Profiling
     /// </summary>
     public class VisualProfiler : MonoBehaviour
     {
-        private const int maxTargetFrameRate = 120;
-
         [Header("Profiler Settings")]
         [SerializeField]
         private bool initiallyActive = true;
@@ -85,16 +79,13 @@ namespace Microsoft.MixedReality.Profiling
         private Quaternion windowVerticalRotation;
         private Quaternion windowVerticalRotationInverse;
 
-        private class FrameInfo
-        {
-            public MaterialPropertyBlock PropertyBlock;
-            public Renderer Renderer;
-        }
-
-        private FrameInfo[] frameInfo;
-        private int frameOffset;
+        private Matrix4x4[] frameInfoMatricies;
+        private Vector4[] frameInfoColors;
+        private MaterialPropertyBlock frameInfoPropertyBlock;
+        private int colorID;
+        private int parentMatrixID;
         private int frameCount;
-        private Stopwatch stopwatch = new Stopwatch();
+        private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
         private string[] frameRateStrings;
         private string displayedDecimalFormat;
 
@@ -102,31 +93,50 @@ namespace Microsoft.MixedReality.Profiling
         private ulong peakMemoryUsage;
         private ulong limitMemoryUsage;
 
-        private MaterialPropertyBlock propertyBlockFrameTarget;
-        private MaterialPropertyBlock propertyBlockFrameMissed;
-
         private KeywordRecognizer keywordRecognizer;
 
         private StringBuilder stringBuilder = new StringBuilder(32);
 
-        [SerializeField]
-        [HideInInspector]
+        // Rendering resources.
+        [SerializeField, HideInInspector]
         private Material defaultMaterial;
+        [SerializeField, HideInInspector]
+        private Material defaultInstancedMaterial;
         private Material backgroundMaterial;
         private Material foregroundMaterial;
         private Material textMaterial;
+        private Mesh quadMesh;
 
+        private static readonly int maxTargetFrameRate = 120;
         private static readonly Vector2 defaultWindowRotation = new Vector2(10.0f, 20.0f);
         private static readonly Vector3 defaultWindowScale = new Vector3(0.2f, 0.04f, 1.0f);
 
         private void Reset()
         {
-            if (!defaultMaterial)
+            if (defaultMaterial == null)
             {
                 defaultMaterial = new Material(Shader.Find("Hidden/Internal-Colored"));
                 defaultMaterial.SetFloat("_ZWrite", 0.0f);
-                defaultMaterial.SetFloat("_ZTest", 0.0f);
+                defaultMaterial.SetFloat("_ZTest", (float)UnityEngine.Rendering.CompareFunction.Disabled);
                 defaultMaterial.renderQueue = 5000;
+            }
+
+            if (defaultInstancedMaterial == null)
+            {
+                Shader defaultInstancedShader = Shader.Find("Hidden/Instanced-Colored");
+
+                if (defaultInstancedShader != null)
+                {
+                    defaultInstancedMaterial = new Material(defaultInstancedShader);
+                    defaultInstancedMaterial.enableInstancing = true;
+                    defaultInstancedMaterial.SetFloat("_ZWrite", 0.0f);
+                    defaultInstancedMaterial.SetFloat("_ZTest", (float)UnityEngine.Rendering.CompareFunction.Disabled);
+                    defaultInstancedMaterial.renderQueue = 5000;
+                }
+                else
+                {
+                    Debug.LogWarning("A shader supporting instancing could not be found for the VisualProfiler, falling back to traditional rendering.");
+                }
             }
 
             if (Application.isPlaying)
@@ -140,6 +150,20 @@ namespace Microsoft.MixedReality.Profiling
                 textMaterial = new Material(meshRenderer.sharedMaterial);
                 textMaterial.renderQueue = defaultMaterial.renderQueue;
                 Destroy(meshRenderer.gameObject);
+
+                MeshFilter quadMeshFilter = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshFilter>();
+                if (defaultInstancedMaterial != null)
+                {
+                    // Create a quad mesh with artificially large bounds to disable culling for instanced rendering.
+                    // TODO: Use shared mesh with normal bounds once Unity allows for more control over instance culling.
+                    quadMesh = quadMeshFilter.mesh;
+                    quadMesh.bounds = new Bounds(Vector3.zero, Vector3.one * float.MaxValue);
+                }
+                else
+                {
+                    quadMesh = quadMeshFilter.sharedMesh;
+                }
+                Destroy(quadMeshFilter.gameObject);
             }
 
             stopwatch.Reset();
@@ -192,18 +216,39 @@ namespace Microsoft.MixedReality.Profiling
                 frameRateText.text = frameRateStrings[Mathf.Clamp(frameRate, 0, maxTargetFrameRate)];
 
                 // Update frame colors.
-                frameInfo[frameOffset].PropertyBlock = FrameRateToPropertyBlock(frameRate);
-
-                for (int i = 0; i < frameRange; ++i)
+                for (int i = frameRange - 1; i > 0; --i)
                 {
-                    int index = (frameOffset + frameRange - i) % frameRange;
-                    frameInfo[i].Renderer.SetPropertyBlock(frameInfo[index].PropertyBlock);
+                    frameInfoColors[i] = frameInfoColors[i - 1];
                 }
 
-                frameOffset = (frameOffset + 1) % frameRange;
+                frameInfoColors[0] = (frameRate >= ((int)(AppFrameRate) - 1)) ? targetFrameRateColor : missedFrameRateColor;
+                frameInfoPropertyBlock.SetVectorArray(colorID, frameInfoColors);
+
+                // Reset timers.
                 frameCount = 0;
                 stopwatch.Reset();
                 stopwatch.Start();
+            }
+
+            // Draw frame info.
+            if (window.activeSelf)
+            {
+                Matrix4x4 parentLocalToWorldMatrix = window.transform.localToWorldMatrix;
+
+                if (defaultInstancedMaterial != null)
+                {
+                    frameInfoPropertyBlock.SetMatrix(parentMatrixID, parentLocalToWorldMatrix);
+                    Graphics.DrawMeshInstanced(quadMesh, 0, defaultInstancedMaterial, frameInfoMatricies, frameInfoMatricies.Length, frameInfoPropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false);
+                }
+                else
+                {
+                    // If a instanced material is not available, fall back to non-instanced rendering.
+                    for (int i  = 0; i < frameInfoMatricies.Length; ++i)
+                    {
+                        frameInfoPropertyBlock.SetColor(colorID, frameInfoColors[i]);
+                        Graphics.DrawMesh(quadMesh, parentLocalToWorldMatrix * frameInfoMatricies[i], defaultMaterial, 0, null, 0, frameInfoPropertyBlock, false, false, false);
+                    }
+                }
             }
 
             // Update memory statistics.
@@ -290,11 +335,8 @@ namespace Microsoft.MixedReality.Profiling
         private void BuildWindow()
         {
             // Initialize property block state.
-            int colorID = Shader.PropertyToID("_Color");
-            propertyBlockFrameTarget = new MaterialPropertyBlock();
-            propertyBlockFrameTarget.SetColor(colorID, targetFrameRateColor);
-            propertyBlockFrameMissed = new MaterialPropertyBlock();
-            propertyBlockFrameMissed.SetColor(colorID, missedFrameRateColor);
+            colorID = Shader.PropertyToID("_Color");
+            parentMatrixID = Shader.PropertyToID("_ParentLocalToWorldMatrix");
 
             // Build the window root.
             {
@@ -311,24 +353,20 @@ namespace Microsoft.MixedReality.Profiling
             {
                 frameRateText = CreateText("FrameRateText", new Vector3(-0.495f, 0.5f, 0.0f), window.transform, TextAnchor.UpperLeft, textMaterial, Color.white, string.Empty);
 
-                frameInfo = new FrameInfo[frameRange];
+                frameInfoMatricies = new Matrix4x4[frameRange];
+                frameInfoColors = new Vector4[frameRange];
                 Vector3 scale = new Vector3(1.0f / frameRange, 0.2f, 1.0f);
                 Vector3 position = new Vector3(0.5f - (scale.x * 0.5f), 0.15f, 0.0f);
 
                 for (int i = 0; i < frameRange; ++i)
                 {
-                    frameInfo[i] = new FrameInfo();
-                    frameInfo[i].PropertyBlock = propertyBlockFrameTarget;
-
-                    GameObject quad = CreateQuad("Frame", window.transform);
-                    frameInfo[i].Renderer = InitializeRenderer(quad, defaultMaterial, colorID, missedFrameRateColor);
-
-                    quad.transform.localPosition = position;
-                    Vector3 bufferedScale = new Vector3(scale.x * 0.8f, scale.y, scale.z);
-                    quad.transform.localScale = bufferedScale;
-
+                    frameInfoMatricies[i] = Matrix4x4.TRS(position, Quaternion.identity, new Vector3(scale.x * 0.8f, scale.y, scale.z));
                     position.x -= scale.x;
+                    frameInfoColors[i] = targetFrameRateColor;
                 }
+
+                frameInfoPropertyBlock = new MaterialPropertyBlock();
+                frameInfoPropertyBlock.SetVectorArray(colorID, frameInfoColors);
             }
 
             // Add memory usage text and bars.
@@ -410,12 +448,6 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        private MaterialPropertyBlock FrameRateToPropertyBlock(int frameRate)
-        {
-            // Application frame rate minus one because the integer frame rate is rounded down.
-            return (frameRate >= ((int)(AppFrameRate) - 1)) ? propertyBlockFrameTarget : propertyBlockFrameMissed;
-        }
-
         private static Transform CreateAnchor(string name, Transform parent)
         {
             Transform anchor = new GameObject(name).transform;
@@ -447,6 +479,7 @@ namespace Microsoft.MixedReality.Profiling
             textMesh.anchor = anchor;
             textMesh.color = color;
             textMesh.text = text;
+            textMesh.richText = false;
 
             Renderer renderer = obj.GetComponent<Renderer>();
             renderer.sharedMaterial = material;
@@ -475,11 +508,7 @@ namespace Microsoft.MixedReality.Profiling
         {
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
-#if UNITY_5_5_OR_NEWER
             renderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
-#else
-            renderer.motionVectors = false;
-#endif
             renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
 #if UNITY_2017_2_OR_NEWER
