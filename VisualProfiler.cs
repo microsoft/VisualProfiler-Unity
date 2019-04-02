@@ -19,13 +19,13 @@ namespace Microsoft.MixedReality.Profiling
     /// your Unity scene. The profiler is initially enabled (toggle-able via the initiallyActive 
     /// property), but can be toggled via the enabled/disable voice commands keywords.
     ///
+    /// NOTE: For improved rendering performance you can optionally include the 
+    /// "Hidden/Instanced-Colored" shader in your project along with the VisualProfiler.
+    /// 
     /// IMPORTANT: Please make sure to add the microphone capability to your app if you plan 
     /// on using the enable/disable keywords, in Unity under Edit -> Project Settings -> 
     /// Player -> Settings for Windows Store -> Publishing Settings -> Capabilities or in your 
     /// Visual Studio Package.appxmanifest capabilities.
-    /// 
-    /// NOTE: For improved rendering performance you can optionally include the 
-    /// "Hidden/Instanced-Colored" shader in your project along with the VisualProfiler.
     /// 
     /// </summary>
     public class VisualProfiler : MonoBehaviour
@@ -40,39 +40,39 @@ namespace Microsoft.MixedReality.Profiling
         private static readonly string limitMemoryString = "Limit: ";
 
         [Header("Profiler Settings")]
-        [SerializeField]
+        [SerializeField, Tooltip("Should the profiler display automatically or wait for user activation via voice, etc.")]
         private bool initiallyActive = true;
-        [SerializeField]
+        [SerializeField, Tooltip("Voice commands to toggle the profiler on and off.")]
         private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
-        [SerializeField, Range(1, 60)]
+        [SerializeField, Range(1, 60), Tooltip("How many frames to display as colored boxes indicating target or missed frames.")]
         private int frameRange = 30;
-        [SerializeField, Range(0.0f, 1.0f)]
+        [SerializeField, Range(0.0f, 1.0f), Tooltip("How often to update the displayed frame rate(s).")]
         private float frameSampleRate = 0.1f;
 
         [Header("Window Settings")]
-        [SerializeField]
+        [SerializeField, Tooltip("What part of the view port to anchor the window to.")]
         private TextAnchor windowAnchor = TextAnchor.LowerCenter;
-        [SerializeField]
+        [SerializeField, Tooltip("The offset from the window anchor position.")]
         private Vector2 windowOffset = new Vector2(0.075f, 0.1f);
-        [SerializeField, Range(0.5f, 5.0f)]
+        [SerializeField, Range(0.5f, 5.0f), Tooltip("Use to scale the window size up or down, can simulate a zooming effect.")]
         private float windowScale = 1.0f;
-        [SerializeField, Range(0.0f, 100.0f)]
+        [SerializeField, Range(0.0f, 100.0f), Tooltip("How quickly to interpolate the window towards its target position and rotation.")]
         private float windowFollowSpeed = 5.0f;
 
         [Header("UI Settings")]
-        [SerializeField, Range(0, 3)]
+        [SerializeField, Range(0, 3), Tooltip("How many decimal places to display on numeric strings.")]
         private int displayedDecimalDigits = 1;
-        [SerializeField]
+        [SerializeField, Tooltip("The color of the window backplate.")]
         private Color baseColor = new Color(80 / 256.0f, 80 / 256.0f, 80 / 256.0f, 1.0f);
-        [SerializeField]
+        [SerializeField, Tooltip("The color to display on frames which meet or exceed the target frame rate.")]
         private Color targetFrameRateColor = new Color(127 / 256.0f, 186 / 256.0f, 0 / 256.0f, 1.0f);
-        [SerializeField]
+        [SerializeField, Tooltip("The color to display on frames which fall below the target frame rate.")]
         private Color missedFrameRateColor = new Color(242 / 256.0f, 80 / 256.0f, 34 / 256.0f, 1.0f);
-        [SerializeField]
+        [SerializeField, Tooltip("The color to display for current memory usage values.")]
         private Color memoryUsedColor = new Color(0 / 256.0f, 164 / 256.0f, 239 / 256.0f, 1.0f);
-        [SerializeField]
+        [SerializeField, Tooltip("The color to display for peak (aka max) memory usage values.")]
         private Color memoryPeakColor = new Color(255 / 256.0f, 185 / 256.0f, 0 / 256.0f, 1.0f);
-        [SerializeField]
+        [SerializeField, Tooltip("The color to display for the platforms memory usage limit.")]
         private Color memoryLimitColor = new Color(150 / 256.0f, 150 / 256.0f, 150 / 256.0f, 1.0f);
 
         private GameObject window;
