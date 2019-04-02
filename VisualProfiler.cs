@@ -52,8 +52,8 @@ namespace Microsoft.MixedReality.Profiling
         [Header("Window Settings")]
         [SerializeField, Tooltip("What part of the view port to anchor the window to.")]
         private TextAnchor windowAnchor = TextAnchor.LowerCenter;
-        [SerializeField, Tooltip("The offset from the window anchor position.")]
-        private Vector2 windowOffset = new Vector2(0.075f, 0.1f);
+        [SerializeField, Tooltip("The offset from the view port center applied based on the window anchor selection.")]
+        private Vector2 windowOffset = new Vector2(0.1f, 0.1f);
         [SerializeField, Range(0.5f, 5.0f), Tooltip("Use to scale the window size up or down, can simulate a zooming effect.")]
         private float windowScale = 1.0f;
         [SerializeField, Range(0.0f, 100.0f), Tooltip("How quickly to interpolate the window towards its target position and rotation.")]
@@ -93,7 +93,6 @@ namespace Microsoft.MixedReality.Profiling
         private MaterialPropertyBlock frameInfoPropertyBlock;
         private int colorID;
         private int parentMatrixID;
-        private bool lastFrameMissed;
         private int frameCount;
         private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
         private FrameTiming[] frameTimings = new FrameTiming[maxFrameTimings];
@@ -158,6 +157,7 @@ namespace Microsoft.MixedReality.Profiling
                 Destroy(meshRenderer.gameObject);
 
                 MeshFilter quadMeshFilter = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshFilter>();
+
                 if (defaultInstancedMaterial != null)
                 {
                     // Create a quad mesh with artificially large bounds to disable culling for instanced rendering.
@@ -169,6 +169,7 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     quadMesh = quadMeshFilter.sharedMesh;
                 }
+
                 Destroy(quadMeshFilter.gameObject);
             }
 
@@ -251,12 +252,9 @@ namespace Microsoft.MixedReality.Profiling
                 }
 
                 // Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
-                // But, many of these APIs are inaccessible in Unity. Currently missed frames are assumed when two consecutive frames are under
-                // the target frame rate. Two frames avoids scenarios where presentation can "catch up" after a single missed frame.
-                bool missedFrame = (cpuFrameRate < ((int)(AppFrameRate) - 1));
-                frameInfoColors[0] = (missedFrame && lastFrameMissed) ? missedFrameRateColor : targetFrameRateColor;
-                lastFrameMissed = missedFrame;
-
+                // But, many of these APIs are inaccessible in Unity. Currently missed frames are assumed when the average cpuFrameRate 
+                // is under the target frame rate.
+                frameInfoColors[0] = (cpuFrameRate < ((int)(AppFrameRate) - 1)) ? missedFrameRateColor : targetFrameRateColor;
                 frameInfoPropertyBlock.SetVectorArray(colorID, frameInfoColors);
 
                 // Reset timers.
@@ -328,7 +326,7 @@ namespace Microsoft.MixedReality.Profiling
 
         private Vector3 CalculateWindowPosition(Transform cameraTransform)
         {
-            float windowDistance = Mathf.Max(16.0f / Camera.main.fieldOfView, Camera.main.nearClipPlane + 0.2f);
+            float windowDistance = Mathf.Max(16.0f / Camera.main.fieldOfView, Camera.main.nearClipPlane + 0.25f);
             Vector3 position = cameraTransform.position + (cameraTransform.forward * windowDistance);
             Vector3 horizontalOffset = cameraTransform.right * windowOffset.x;
             Vector3 verticalOffset = cameraTransform.up * windowOffset.y;
@@ -562,29 +560,49 @@ namespace Microsoft.MixedReality.Profiling
             int memoryUsageFractionalDigits = (int)((memoryUsageMB - memoryUsageIntegerDigits) * Mathf.Pow(10.0f, displayedDecimalDigits));
             int bufferIndex = 0;
 
-            for (int i = 0; i < prefixString.Length; ++i, ++bufferIndex)
+            for (int i = 0; i < prefixString.Length; ++i)
             {
-                stringBuffer[bufferIndex] = prefixString[i];
+                stringBuffer[bufferIndex++] = prefixString[i];
             }
 
-            for (; memoryUsageIntegerDigits != 0; memoryUsageIntegerDigits /= 10, ++bufferIndex)
-            {
-                stringBuffer[bufferIndex] = (char)((char)(memoryUsageIntegerDigits % 10) + '0');
-            }
+            bufferIndex = MemoryItoA(memoryUsageIntegerDigits, stringBuffer, bufferIndex);
+            stringBuffer[bufferIndex++] = '.';
 
             if (memoryUsageFractionalDigits != 0)
             {
-                stringBuffer[bufferIndex++] = '.';
-
-                for (; memoryUsageFractionalDigits != 0; memoryUsageFractionalDigits /= 10, ++bufferIndex)
+                bufferIndex = MemoryItoA(memoryUsageFractionalDigits, stringBuffer, bufferIndex);
+            }
+            else
+            {
+                for (int i = 0; i < displayedDecimalDigits; ++i)
                 {
-                    stringBuffer[bufferIndex] = (char)((char)(memoryUsageFractionalDigits % 10) + '0');
+                    stringBuffer[bufferIndex++] = '0';
                 }
             }
 
             stringBuffer[bufferIndex++] = 'M';
             stringBuffer[bufferIndex++] = 'B';
             textMesh.text = new string(stringBuffer, 0, bufferIndex);
+        }
+
+        private static int MemoryItoA(int value, char[] stringBuffer, int bufferIndex)
+        {
+            int startIndex = bufferIndex;
+
+            for (; value != 0; value /= 10)
+            {
+                stringBuffer[bufferIndex++] = (char)((char)(value % 10) + '0');
+            }
+
+            char temp;
+            for (int endIndex = bufferIndex - 1; startIndex < endIndex; ++startIndex, --endIndex)
+            {
+                temp = stringBuffer[startIndex];
+                stringBuffer[startIndex] = stringBuffer[endIndex];
+                stringBuffer[endIndex] = temp;
+            }
+
+            return bufferIndex;
         }
 
         private static float AppFrameRate
