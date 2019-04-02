@@ -9,6 +9,7 @@ using UnityEngine.Profiling;
 namespace Microsoft.MixedReality.Profiling
 {
     /// <summary>
+    /// 
     /// ABOUT: The VisualProfiler provides a drop in, single file, solution for viewing 
     /// your Windows Mixed Reality Unity application's frame rate and memory usage. Missed 
     /// frames are displayed over time to visually find problem areas. Memory is reported 
@@ -22,11 +23,16 @@ namespace Microsoft.MixedReality.Profiling
     /// on using the enable/disable keywords, in Unity under Edit -> Project Settings -> 
     /// Player -> Settings for Windows Store -> Publishing Settings -> Capabilities or in your 
     /// Visual Studio Package.appxmanifest capabilities.
+    /// 
+    /// NOTE: For improved rendering performance you can optionally include the 
+    /// "Hidden/Instanced-Colored" shader in your project along with the VisualProfiler.
+    /// 
     /// </summary>
     public class VisualProfiler : MonoBehaviour
     {
         private static readonly int maxStringLength = 32;
         private static readonly int maxTargetFrameRate = 120;
+        private static readonly int maxFrameTimings = 128;
         private static readonly Vector2 defaultWindowRotation = new Vector2(10.0f, 20.0f);
         private static readonly Vector3 defaultWindowScale = new Vector3(0.2f, 0.04f, 1.0f);
         private static readonly string usedMemoryString = "Used: ";
@@ -70,7 +76,8 @@ namespace Microsoft.MixedReality.Profiling
         private Color memoryLimitColor = new Color(150 / 256.0f, 150 / 256.0f, 150 / 256.0f, 1.0f);
 
         private GameObject window;
-        private TextMesh frameRateText;
+        private TextMesh cpuFrameRateText;
+        private TextMesh gpuFrameRateText;
         private TextMesh usedMemoryText;
         private TextMesh peakMemoryText;
         private TextMesh limitMemoryText;
@@ -86,9 +93,12 @@ namespace Microsoft.MixedReality.Profiling
         private MaterialPropertyBlock frameInfoPropertyBlock;
         private int colorID;
         private int parentMatrixID;
+        private bool lastFrameMissed;
         private int frameCount;
         private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-        private string[] frameRateStrings;
+        private FrameTiming[] frameTimings = new FrameTiming[maxFrameTimings];
+        private string[] cpuFrameRateStrings;
+        private string[] gpuFrameRateStrings;
         private char[] stringBuffer = new char[maxStringLength];
 
         private ulong memoryUsage;
@@ -202,14 +212,37 @@ namespace Microsoft.MixedReality.Profiling
                 window.transform.localScale = defaultWindowScale * windowScale;
             }
 
+            // Capture frame timings every frame and read from it depending on the frameSampleRate.
+            FrameTimingManager.CaptureFrameTimings();
+
             ++frameCount;
             float elapsedSeconds = stopwatch.ElapsedMilliseconds * 0.001f;
 
             if (elapsedSeconds >= frameSampleRate)
             {
+                int cpuFrameRate = (int)(1.0f / (elapsedSeconds / frameCount));
+                int gpuFrameRate = 0;
+
+                // Many platforms do not yet support the FrameTimingManager. When timing data is returned from the FrameTimingManager we will use
+                // its timing data, else we will depend on the stopwatch.
+                uint frameTimingsCount = FrameTimingManager.GetLatestTimings((uint)Mathf.Min(frameCount, maxFrameTimings), frameTimings);
+
+                if (frameTimingsCount != 0)
+                {
+                    float cpuFrameTime, gpuFrameTime;
+                    AverageFrameTiming(frameTimings, frameTimingsCount, out cpuFrameTime, out gpuFrameTime);
+                    cpuFrameRate = (int)(1.0f / (cpuFrameTime / frameCount));
+                    gpuFrameRate = (int)(1.0f / (gpuFrameTime / frameCount));
+                }
+
                 // Update frame rate text.
-                int frameRate = (int)(1.0f / (elapsedSeconds / frameCount));
-                frameRateText.text = frameRateStrings[Mathf.Clamp(frameRate, 0, maxTargetFrameRate)];
+                cpuFrameRateText.text = cpuFrameRateStrings[Mathf.Clamp(cpuFrameRate, 0, maxTargetFrameRate)];
+
+                if (gpuFrameRate != 0)
+                {
+                    gpuFrameRateText.gameObject.SetActive(true);
+                    gpuFrameRateText.text = gpuFrameRateStrings[Mathf.Clamp(gpuFrameRate, 0, maxTargetFrameRate)];
+                }
 
                 // Update frame colors.
                 for (int i = frameRange - 1; i > 0; --i)
@@ -217,7 +250,13 @@ namespace Microsoft.MixedReality.Profiling
                     frameInfoColors[i] = frameInfoColors[i - 1];
                 }
 
-                frameInfoColors[0] = (frameRate >= ((int)(AppFrameRate) - 1)) ? targetFrameRateColor : missedFrameRateColor;
+                // Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
+                // But, many of these APIs are inaccessible in Unity. Currently missed frames are assumed when two consecutive frames are under
+                // the target frame rate. Two frames avoids scenarios where presentation can "catch up" after a single missed frame.
+                bool missedFrame = (cpuFrameRate < ((int)(AppFrameRate) - 1));
+                frameInfoColors[0] = (missedFrame && lastFrameMissed) ? missedFrameRateColor : targetFrameRateColor;
+                lastFrameMissed = missedFrame;
+
                 frameInfoPropertyBlock.SetVectorArray(colorID, frameInfoColors);
 
                 // Reset timers.
@@ -347,7 +386,9 @@ namespace Microsoft.MixedReality.Profiling
 
             // Add frame rate text and frame indicators.
             {
-                frameRateText = CreateText("FrameRateText", new Vector3(-0.495f, 0.5f, 0.0f), window.transform, TextAnchor.UpperLeft, textMaterial, Color.white, string.Empty);
+                cpuFrameRateText = CreateText("CPUFrameRateText", new Vector3(-0.495f, 0.5f, 0.0f), window.transform, TextAnchor.UpperLeft, textMaterial, Color.white, string.Empty);
+                gpuFrameRateText = CreateText("GPUFrameRateText", new Vector3(0.495f, 0.5f, 0.0f), window.transform, TextAnchor.UpperRight, textMaterial, Color.white, string.Empty);
+                gpuFrameRateText.gameObject.SetActive(false);
 
                 frameInfoMatricies = new Matrix4x4[frameRange];
                 frameInfoColors = new Vector4[frameRange];
@@ -399,19 +440,22 @@ namespace Microsoft.MixedReality.Profiling
 
         private void BuildFrameRateStrings()
         {
-            frameRateStrings = new string[maxTargetFrameRate + 1];
+            cpuFrameRateStrings = new string[maxTargetFrameRate + 1];
+            gpuFrameRateStrings = new string[maxTargetFrameRate + 1];
             string displayedDecimalFormat = string.Format("{{0:F{0}}}", displayedDecimalDigits);
 
             StringBuilder stringBuilder = new StringBuilder(32);
             StringBuilder milisecondStringBuilder = new StringBuilder(16);
-            stringBuilder.Length = 0;
 
-            for (int i = 0; i < frameRateStrings.Length; ++i)
+            for (int i = 0; i < cpuFrameRateStrings.Length; ++i)
             {
                 float miliseconds = (i == 0) ? 0.0f : (1.0f / i) * 1000.0f;
                 milisecondStringBuilder.AppendFormat(displayedDecimalFormat, miliseconds);
-                stringBuilder.AppendFormat("{0} fps ({1} ms)", i.ToString(), milisecondStringBuilder.ToString());
-                frameRateStrings[i] = stringBuilder.ToString();
+                stringBuilder.AppendFormat("CPU: {0} fps ({1} ms)", i.ToString(), milisecondStringBuilder.ToString());
+                cpuFrameRateStrings[i] = stringBuilder.ToString();
+                stringBuilder.Length = 0;
+                stringBuilder.AppendFormat("GPU: {0} fps ({1} ms)", i.ToString(), milisecondStringBuilder.ToString());
+                gpuFrameRateStrings[i] = stringBuilder.ToString();
                 milisecondStringBuilder.Length = 0;
                 stringBuilder.Length = 0;
             }
@@ -551,6 +595,24 @@ namespace Microsoft.MixedReality.Profiling
                 float refreshRate = UnityEngine.XR.XRDevice.refreshRate;
                 return ((int)refreshRate == 0) ? 60.0f : refreshRate;
             }
+        }
+
+        private static void AverageFrameTiming(FrameTiming[] frameTimings, uint frameTimingsCount, out float cpuFrameTime, out float gpuFrameTime)
+        {
+            double cpuTime = 0.0f;
+            double gpuTime = 0.0f;
+
+            for (int i = 0; i < frameTimingsCount; ++i)
+            {
+                cpuTime += frameTimings[i].cpuFrameTime;
+                gpuTime += frameTimings[i].gpuFrameTime;
+            }
+
+            cpuTime /= frameTimingsCount;
+            gpuTime /= frameTimingsCount;
+
+            cpuFrameTime = (float)(cpuTime * 0.001);
+            gpuFrameTime = (float)(gpuTime * 0.001);
         }
 
         private static ulong AppMemoryUsage
