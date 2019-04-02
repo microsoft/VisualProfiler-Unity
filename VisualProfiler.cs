@@ -25,6 +25,14 @@ namespace Microsoft.MixedReality.Profiling
     /// </summary>
     public class VisualProfiler : MonoBehaviour
     {
+        private static readonly int maxStringLength = 32;
+        private static readonly int maxTargetFrameRate = 120;
+        private static readonly Vector2 defaultWindowRotation = new Vector2(10.0f, 20.0f);
+        private static readonly Vector3 defaultWindowScale = new Vector3(0.2f, 0.04f, 1.0f);
+        private static readonly string usedMemoryString = "Used: ";
+        private static readonly string peakMemoryString = "Peak: ";
+        private static readonly string limitMemoryString = "Limit: ";
+
         [Header("Profiler Settings")]
         [SerializeField]
         private bool initiallyActive = true;
@@ -48,12 +56,6 @@ namespace Microsoft.MixedReality.Profiling
         [Header("UI Settings")]
         [SerializeField, Range(0, 3)]
         private int displayedDecimalDigits = 1;
-        [SerializeField]
-        private string usedMemoryString = "Used: {0}MB";
-        [SerializeField]
-        private string peakMemoryString = "Peak: {0}MB";
-        [SerializeField]
-        private string limitMemoryString = "Limit: {0}MB";
         [SerializeField]
         private Color baseColor = new Color(80 / 256.0f, 80 / 256.0f, 80 / 256.0f, 1.0f);
         [SerializeField]
@@ -87,15 +89,13 @@ namespace Microsoft.MixedReality.Profiling
         private int frameCount;
         private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
         private string[] frameRateStrings;
-        private string displayedDecimalFormat;
+        private char[] stringBuffer = new char[maxStringLength];
 
         private ulong memoryUsage;
         private ulong peakMemoryUsage;
         private ulong limitMemoryUsage;
 
         private KeywordRecognizer keywordRecognizer;
-
-        private StringBuilder stringBuilder = new StringBuilder(32);
 
         // Rendering resources.
         [SerializeField, HideInInspector]
@@ -106,10 +106,6 @@ namespace Microsoft.MixedReality.Profiling
         private Material foregroundMaterial;
         private Material textMaterial;
         private Mesh quadMesh;
-
-        private static readonly int maxTargetFrameRate = 120;
-        private static readonly Vector2 defaultWindowRotation = new Vector2(10.0f, 20.0f);
-        private static readonly Vector3 defaultWindowScale = new Vector3(0.2f, 0.04f, 1.0f);
 
         private void Reset()
         {
@@ -258,7 +254,7 @@ namespace Microsoft.MixedReality.Profiling
             {
                 if (window.activeSelf && WillDisplayedMemoryUsageDiffer(limitMemoryUsage, limit, displayedDecimalDigits))
                 {
-                    MemoryUsageToString(stringBuilder, displayedDecimalFormat, limitMemoryText, limitMemoryString, limit);
+                    MemoryUsageToString(stringBuffer, displayedDecimalDigits, limitMemoryText, limitMemoryString, limit);
                 }
 
                 limitMemoryUsage = limit;
@@ -272,7 +268,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (window.activeSelf && WillDisplayedMemoryUsageDiffer(memoryUsage, usage, displayedDecimalDigits))
                 {
-                    MemoryUsageToString(stringBuilder, displayedDecimalFormat, usedMemoryText, usedMemoryString, usage);
+                    MemoryUsageToString(stringBuffer, displayedDecimalDigits, usedMemoryText, usedMemoryString, usage);
                 }
 
                 memoryUsage = usage;
@@ -284,7 +280,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (window.activeSelf && WillDisplayedMemoryUsageDiffer(peakMemoryUsage, memoryUsage, displayedDecimalDigits))
                 {
-                    MemoryUsageToString(stringBuilder, displayedDecimalFormat, peakMemoryText, peakMemoryString, memoryUsage);
+                    MemoryUsageToString(stringBuffer, displayedDecimalDigits, peakMemoryText, peakMemoryString, memoryUsage);
                 }
 
                 peakMemoryUsage = memoryUsage;
@@ -404,8 +400,9 @@ namespace Microsoft.MixedReality.Profiling
         private void BuildFrameRateStrings()
         {
             frameRateStrings = new string[maxTargetFrameRate + 1];
-            displayedDecimalFormat = string.Format("{{0:F{0}}}", displayedDecimalDigits);
+            string displayedDecimalFormat = string.Format("{{0:F{0}}}", displayedDecimalDigits);
 
+            StringBuilder stringBuilder = new StringBuilder(32);
             StringBuilder milisecondStringBuilder = new StringBuilder(16);
             stringBuilder.Length = 0;
 
@@ -441,9 +438,9 @@ namespace Microsoft.MixedReality.Profiling
                     window.SetActive(true);
 
                     // Force refresh of strings.
-                    MemoryUsageToString(stringBuilder, displayedDecimalFormat, limitMemoryText, limitMemoryString, limitMemoryUsage);
-                    MemoryUsageToString(stringBuilder, displayedDecimalFormat, usedMemoryText, usedMemoryString, memoryUsage);
-                    MemoryUsageToString(stringBuilder, displayedDecimalFormat, peakMemoryText, peakMemoryString, peakMemoryUsage);
+                    MemoryUsageToString(stringBuffer, displayedDecimalDigits, limitMemoryText, limitMemoryString, limitMemoryUsage);
+                    MemoryUsageToString(stringBuffer, displayedDecimalDigits, usedMemoryText, usedMemoryString, memoryUsage);
+                    MemoryUsageToString(stringBuffer, displayedDecimalDigits, peakMemoryText, peakMemoryString, peakMemoryUsage);
                 }
             }
         }
@@ -511,31 +508,47 @@ namespace Microsoft.MixedReality.Profiling
             renderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
             renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
-#if UNITY_2017_2_OR_NEWER
             renderer.allowOcclusionWhenDynamic = false;
-#endif
         }
 
-        private static void MemoryUsageToString(StringBuilder stringBuilder, string displayedDecimalFormat, TextMesh textMesh, string memoryString, ulong memoryUsage)
+        private static void MemoryUsageToString(char[] stringBuffer, int displayedDecimalDigits, TextMesh textMesh, string prefixString, ulong memoryUsage)
         {
-            stringBuilder.Length = 0;
-            // Note, this can trigger an allocation and can be called each frame. But, with default settings this function should only fire with memory deltas of +-1KB.
-            string megabytes = stringBuilder.AppendFormat(displayedDecimalFormat, ConvertBytesToMegabytes(memoryUsage)).ToString();
-            stringBuilder.Length = 0;
-            textMesh.text = stringBuilder.AppendFormat(memoryString, megabytes).ToString();
+            float memoryUsageMB = ConvertBytesToMegabytes(memoryUsage);
+            int memoryUsageIntegerDigits = (int)memoryUsageMB;
+            int memoryUsageFractionalDigits = (int)((memoryUsageMB - memoryUsageIntegerDigits) * Mathf.Pow(10.0f, displayedDecimalDigits));
+            int bufferIndex = 0;
+
+            for (int i = 0; i < prefixString.Length; ++i, ++bufferIndex)
+            {
+                stringBuffer[bufferIndex] = prefixString[i];
+            }
+
+            for (; memoryUsageIntegerDigits != 0; memoryUsageIntegerDigits /= 10, ++bufferIndex)
+            {
+                stringBuffer[bufferIndex] = (char)((char)(memoryUsageIntegerDigits % 10) + '0');
+            }
+
+            if (memoryUsageFractionalDigits != 0)
+            {
+                stringBuffer[bufferIndex++] = '.';
+
+                for (; memoryUsageFractionalDigits != 0; memoryUsageFractionalDigits /= 10, ++bufferIndex)
+                {
+                    stringBuffer[bufferIndex] = (char)((char)(memoryUsageFractionalDigits % 10) + '0');
+                }
+            }
+
+            stringBuffer[bufferIndex++] = 'M';
+            stringBuffer[bufferIndex++] = 'B';
+            textMesh.text = new string(stringBuffer, 0, bufferIndex);
         }
 
         private static float AppFrameRate
         {
             get
             {
-                float refreshRate;
-#if UNITY_2017_2_OR_NEWER
-                refreshRate = UnityEngine.XR.XRDevice.refreshRate;
-#else
-                refreshRate = UnityEngine.VR.XRDevice.refreshRate;
-#endif
                 // If the current XR SDK does not report refresh rate information, assume 60Hz.
+                float refreshRate = UnityEngine.XR.XRDevice.refreshRate;
                 return ((int)refreshRate == 0) ? 60.0f : refreshRate;
             }
         }
@@ -564,18 +577,13 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        private static bool WillDisplayedMemoryUsageDiffer(ulong oldUsage, ulong newUsage, int memoryUsageDecimalDigits)
+        private static bool WillDisplayedMemoryUsageDiffer(ulong oldUsage, ulong newUsage, int displayedDecimalDigits)
         {
             float oldUsageMBs = ConvertBytesToMegabytes(oldUsage);
             float newUsageMBs = ConvertBytesToMegabytes(newUsage);
+            float decimalPower = Mathf.Pow(10.0f, displayedDecimalDigits);
 
-            for (int i = 0; i < memoryUsageDecimalDigits; ++i)
-            {
-                oldUsageMBs *= 10.0f;
-                newUsageMBs *= 10.0f;
-            }
-
-            return (int)oldUsageMBs != (int)newUsageMBs;
+            return (int)(oldUsageMBs * decimalPower) != (int)(newUsageMBs * decimalPower);
         }
 
         private static ulong ConvertMegabytesToBytes(int megabytes)
