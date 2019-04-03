@@ -10,7 +10,7 @@ using UnityEngine.Windows.Speech;
 using Windows.System;
 #endif
 
-namespace Microsoft.MixedReality.Toolkit.Diagnostics
+namespace Microsoft.MixedReality.Profiling
 {
     /// <summary>
     /// 
