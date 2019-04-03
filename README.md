@@ -16,7 +16,7 @@ The Visual Profiler is targeted towards profiling 3D UWP Unity applications, and
 ## Installation
 Clone, or download, VisualProfiler.cs and place it anywhere within the Assets folder of your Unity project. 
 
-Next, add the VisualProfiler component to any gameobject in the Unity scene you wish to profile. The profiler is initially disabled (toggle-able via the initiallyActive property), but can be toggled via the enabled/disable voice command keywords.
+Next, add the VisualProfiler component to any GameObject in the Unity scene you wish to profile. The profiler is initially active and visible (toggle-able via the IsVisible property), but can be toggled via the enabled/disable voice commands keywords.
 
 NOTE: For improved rendering performance you can optionally include the "Hidden/Instanced-Colored" shader in your project along with the VisualProfiler.
 
@@ -30,7 +30,7 @@ When using the profiler look for "missed frames" which appear as orange bars. Mi
 
 One should also keep an eye on the bottom memory bar to insure memory usage isn't rapidly changing or approaching the application's memory limit.
 
-The profiler UI (such as color, text, and follow behavior) can also be tweaked in the component inspector.
+The profiler UI (such as anchoring, scale, follow behavior and UI color) can also be tweaked in the component inspector.
 
 <img src="External/Images/ProfilerInspector.png" alt="drawing" width="500px">
 
