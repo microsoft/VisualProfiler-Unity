@@ -1,12 +1,16 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
-using UnityEngine;
-using UnityEngine.Windows.Speech;
 using System.Text;
+using UnityEngine;
 using UnityEngine.Profiling;
+using UnityEngine.Windows.Speech;
 
-namespace Microsoft.MixedReality.Profiling
+#if WINDOWS_UWP
+using Windows.System;
+#endif
+
+namespace Microsoft.MixedReality.Toolkit.Diagnostics
 {
     /// <summary>
     /// 
@@ -15,9 +19,9 @@ namespace Microsoft.MixedReality.Profiling
     /// frames are displayed over time to visually find problem areas. Memory is reported 
     /// as current, peak and max usage in a bar graph. 
     /// 
-    /// USAGE: To use this profiler simply add this script as a component of any gameobject in 
-    /// your Unity scene. The profiler is initially enabled (toggle-able via the initiallyActive 
-    /// property), but can be toggled via the enabled/disable voice commands keywords.
+    /// USAGE: To use this profiler simply add this script as a component of any GameObject in 
+    /// your Unity scene. The profiler is initially active and visible (toggle-able via the 
+    /// IsVisible property), but can be toggled via the enabled/disable voice commands keywords.
     ///
     /// NOTE: For improved rendering performance you can optionally include the 
     /// "Hidden/Instanced-Colored" shader in your project along with the VisualProfiler.
@@ -33,33 +37,74 @@ namespace Microsoft.MixedReality.Profiling
         private static readonly int maxStringLength = 32;
         private static readonly int maxTargetFrameRate = 120;
         private static readonly int maxFrameTimings = 128;
+        private static readonly int frameRange = 30;
         private static readonly Vector2 defaultWindowRotation = new Vector2(10.0f, 20.0f);
         private static readonly Vector3 defaultWindowScale = new Vector3(0.2f, 0.04f, 1.0f);
         private static readonly string usedMemoryString = "Used: ";
         private static readonly string peakMemoryString = "Peak: ";
         private static readonly string limitMemoryString = "Limit: ";
 
+        public Transform WindowParent { get; set; } = null;
+
         [Header("Profiler Settings")]
-        [SerializeField, Tooltip("Should the profiler display automatically or wait for user activation via voice, etc.")]
-        private bool initiallyActive = true;
-        [SerializeField, Tooltip("Voice commands to toggle the profiler on and off.")]
-        private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
-        [SerializeField, Range(1, 60), Tooltip("How many frames to display as colored boxes indicating target or missed frames.")]
-        private int frameRange = 30;
-        [SerializeField, Range(0.0f, 1.0f), Tooltip("How often to update the displayed frame rate(s).")]
+        [SerializeField, Tooltip("Is the profiler currently visible.")]
+        private bool isVisible = true;
+
+        public bool IsVisible
+        {
+            get { return isVisible; }
+            set { isVisible = value; }
+        }
+
+        [SerializeField, Tooltip("The amount of time, in seconds, to collect frames for frame rate calculation.")]
         private float frameSampleRate = 0.1f;
+
+        public float FrameSampleRate
+        {
+            get { return frameSampleRate; }
+            set { frameSampleRate = value; }
+        }
 
         [Header("Window Settings")]
         [SerializeField, Tooltip("What part of the view port to anchor the window to.")]
         private TextAnchor windowAnchor = TextAnchor.LowerCenter;
+
+        public TextAnchor WindowAnchor
+        {
+            get { return windowAnchor; }
+            set { windowAnchor = value; }
+        }
+
         [SerializeField, Tooltip("The offset from the view port center applied based on the window anchor selection.")]
         private Vector2 windowOffset = new Vector2(0.1f, 0.1f);
+
+        public Vector2 WindowOffset
+        {
+            get { return windowOffset; }
+            set { windowOffset = value; }
+        }
+
         [SerializeField, Range(0.5f, 5.0f), Tooltip("Use to scale the window size up or down, can simulate a zooming effect.")]
         private float windowScale = 1.0f;
+
+        public float WindowScale
+        {
+            get { return windowScale; }
+            set { windowScale = Mathf.Clamp(value, 0.5f, 5.0f); }
+        }
+
         [SerializeField, Range(0.0f, 100.0f), Tooltip("How quickly to interpolate the window towards its target position and rotation.")]
         private float windowFollowSpeed = 5.0f;
 
+        public float WindowFollowSpeed
+        {
+            get { return windowFollowSpeed; }
+            set { windowFollowSpeed = Mathf.Abs(value); }
+        }
+
         [Header("UI Settings")]
+        [SerializeField, Tooltip("Voice commands to toggle the profiler on and off.")]
+        private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
         [SerializeField, Range(0, 3), Tooltip("How many decimal places to display on numeric strings.")]
         private int displayedDecimalDigits = 1;
         [SerializeField, Tooltip("The color of the window backplate.")]
@@ -88,7 +133,7 @@ namespace Microsoft.MixedReality.Profiling
         private Quaternion windowVerticalRotation;
         private Quaternion windowVerticalRotationInverse;
 
-        private Matrix4x4[] frameInfoMatricies;
+        private Matrix4x4[] frameInfoMatrices;
         private Vector4[] frameInfoColors;
         private MaterialPropertyBlock frameInfoPropertyBlock;
         private int colorID;
@@ -140,7 +185,7 @@ namespace Microsoft.MixedReality.Profiling
                 }
                 else
                 {
-                    Debug.LogWarning("A shader supporting instancing could not be found for the VisualProfiler, falling back to traditional rendering.");
+                    Debug.LogWarning("A shader supporting instancing could not be found for the VisualProfiler, falling back to traditional rendering. This may impact performance.");
                 }
             }
 
@@ -271,15 +316,15 @@ namespace Microsoft.MixedReality.Profiling
                 if (defaultInstancedMaterial != null)
                 {
                     frameInfoPropertyBlock.SetMatrix(parentMatrixID, parentLocalToWorldMatrix);
-                    Graphics.DrawMeshInstanced(quadMesh, 0, defaultInstancedMaterial, frameInfoMatricies, frameInfoMatricies.Length, frameInfoPropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false);
+                    Graphics.DrawMeshInstanced(quadMesh, 0, defaultInstancedMaterial, frameInfoMatrices, frameInfoMatrices.Length, frameInfoPropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false);
                 }
                 else
                 {
                     // If a instanced material is not available, fall back to non-instanced rendering.
-                    for (int i  = 0; i < frameInfoMatricies.Length; ++i)
+                    for (int i  = 0; i < frameInfoMatrices.Length; ++i)
                     {
                         frameInfoPropertyBlock.SetColor(colorID, frameInfoColors[i]);
-                        Graphics.DrawMesh(quadMesh, parentLocalToWorldMatrix * frameInfoMatricies[i], defaultMaterial, 0, null, 0, frameInfoPropertyBlock, false, false, false);
+                        Graphics.DrawMesh(quadMesh, parentLocalToWorldMatrix * frameInfoMatrices[i], defaultMaterial, 0, null, 0, frameInfoPropertyBlock, false, false, false);
                     }
                 }
             }
@@ -322,6 +367,8 @@ namespace Microsoft.MixedReality.Profiling
 
                 peakMemoryUsage = memoryUsage;
             }
+
+            window.SetActive(isVisible);
         }
 
         private Vector3 CalculateWindowPosition(Transform cameraTransform)
@@ -374,6 +421,7 @@ namespace Microsoft.MixedReality.Profiling
             // Build the window root.
             {
                 window = CreateQuad("VisualProfiler", null);
+                window.transform.parent = WindowParent;
                 InitializeRenderer(window, backgroundMaterial, colorID, baseColor);
                 window.transform.localScale = defaultWindowScale;
                 windowHorizontalRotation = Quaternion.AngleAxis(defaultWindowRotation.y, Vector3.right);
@@ -388,14 +436,14 @@ namespace Microsoft.MixedReality.Profiling
                 gpuFrameRateText = CreateText("GPUFrameRateText", new Vector3(0.495f, 0.5f, 0.0f), window.transform, TextAnchor.UpperRight, textMaterial, Color.white, string.Empty);
                 gpuFrameRateText.gameObject.SetActive(false);
 
-                frameInfoMatricies = new Matrix4x4[frameRange];
+                frameInfoMatrices = new Matrix4x4[frameRange];
                 frameInfoColors = new Vector4[frameRange];
                 Vector3 scale = new Vector3(1.0f / frameRange, 0.2f, 1.0f);
                 Vector3 position = new Vector3(0.5f - (scale.x * 0.5f), 0.15f, 0.0f);
 
                 for (int i = 0; i < frameRange; ++i)
                 {
-                    frameInfoMatricies[i] = Matrix4x4.TRS(position, Quaternion.identity, new Vector3(scale.x * 0.8f, scale.y, scale.z));
+                    frameInfoMatrices[i] = Matrix4x4.TRS(position, Quaternion.identity, new Vector3(scale.x * 0.8f, scale.y, scale.z));
                     position.x -= scale.x;
                     frameInfoColors[i] = targetFrameRateColor;
                 }
@@ -433,7 +481,7 @@ namespace Microsoft.MixedReality.Profiling
                 }
             }
 
-            window.SetActive(initiallyActive);
+            window.SetActive(isVisible);
         }
 
         private void BuildFrameRateStrings()
@@ -555,6 +603,8 @@ namespace Microsoft.MixedReality.Profiling
 
         private static void MemoryUsageToString(char[] stringBuffer, int displayedDecimalDigits, TextMesh textMesh, string prefixString, ulong memoryUsage)
         {
+            // Using a custom number to string method to avoid the overhead, and allocations, of built in string.Format/StringBuilder methods.
+            // We can also make some assumptions since the domain of the input number (memoryUsage) is known.
             float memoryUsageMB = ConvertBytesToMegabytes(memoryUsage);
             int memoryUsageIntegerDigits = (int)memoryUsageMB;
             int memoryUsageFractionalDigits = (int)((memoryUsageMB - memoryUsageIntegerDigits) * Mathf.Pow(10.0f, displayedDecimalDigits));
@@ -638,7 +688,7 @@ namespace Microsoft.MixedReality.Profiling
             get
             {
 #if WINDOWS_UWP
-                return Windows.System.MemoryManager.AppMemoryUsage;
+                return MemoryManager.AppMemoryUsage;
 #else
                 return (ulong)Profiler.GetTotalAllocatedMemoryLong();
 #endif
@@ -650,7 +700,7 @@ namespace Microsoft.MixedReality.Profiling
             get
             {
 #if WINDOWS_UWP
-                return Windows.System.MemoryManager.AppMemoryUsageLimit;
+                return MemoryManager.AppMemoryUsageLimit;
 #else
                 return ConvertMegabytesToBytes(SystemInfo.systemMemorySize);
 #endif
