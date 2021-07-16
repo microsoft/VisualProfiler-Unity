@@ -20,6 +20,7 @@
     "LICENSE*",
     "README.md*",
     "*.cs*",
+    "*.asmdef*",
     "package.json*"
   ]
 }
