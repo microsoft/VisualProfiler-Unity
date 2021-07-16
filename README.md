@@ -2,7 +2,7 @@
 
 The VisualProfiler provides a drop in, single file, solution for viewing your Windows Mixed Reality Unity application's frame rate and memory usage.
 
-<img src="External/Images/ProfilerScreenshot.png" alt="drawing" width="500px">
+<img src="Documentation~/Images/ProfilerScreenshot.png" alt="drawing" width="500px">
 
 Missed frames are displayed over time to visually find problem areas. Memory is reported as current, peak and max usage in a bar graph.
 
@@ -11,10 +11,11 @@ The Visual Profiler is targeted towards profiling 3D UWP Unity applications, and
 - Microsoft HoloLens & HoloLens 2
 - Microsoft Immersive headsets (IHMD)
 - Steam VR (HTC Vive / Oculus Rift)
-- OpenXR platforms 
+- OpenXR platforms
 
 ## Installation
-Clone, or download, VisualProfiler.cs and place it anywhere within the Assets folder of your Unity project. 
+
+Clone, or download, VisualProfiler.cs and place it anywhere within the Assets folder of your Unity project.
 
 Next, add the VisualProfiler component to any GameObject in the Unity scene you wish to profile. The profiler is initially active and visible (toggle-able via the IsVisible property), but can be toggled via the enabled/disable voice commands keywords.
 
@@ -26,20 +27,21 @@ IMPORTANT: Please make sure to add the microphone capability to your app if you 
 
 When using the profiler look for "missed frames" which appear as orange bars. Missed frames indicate your application is not hitting its target frame rate and may need optimization work.
 
-<img src="External/Images/ProfilerGuide.png" alt="drawing" width="500px">
+<img src="Documentation~/Images/ProfilerGuide.png" alt="drawing" width="500px">
 
 One should also keep an eye on the bottom memory bar to insure memory usage isn't rapidly changing or approaching the application's memory limit.
 
 The profiler UI (such as anchoring, scale, follow behavior and UI color) can also be tweaked in the component inspector.
 
-<img src="External/Images/ProfilerInspector.png" alt="drawing" width="500px">
+<img src="Documentation~/Images/ProfilerInspector.png" alt="drawing" width="500px">
 
 # Feedback
+
 To file issues or suggestions, please use the [Issues](https://github.com/Microsoft/VisualProfiler/issues) page for this project on GitHub.
 
 # Contributing
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
+This project welcomes contributions and suggestions. Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
 the rights to use your contribution. For details, visit https://cla.microsoft.com.
 
