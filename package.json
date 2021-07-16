@@ -1,0 +1,26 @@
+{
+  "name": "com.microsoft.mixedreality.visualprofiler",
+  "displayName": "Mixed Reality Visual Profiler",
+  "version": "1.0.0",
+  "unity": "2018.4",
+  "description": "Provides a drop in, single file, solution for viewing your Mixed Reality Unity application's frame rate and memory usage.",
+  "keywords": [
+    "microsoft",
+    "mixed",
+    "reality",
+    "hololens"
+  ],
+  "author": "Microsoft",
+  "dependencies": {
+  },
+  "license": "MIT",
+  "files": [
+    "/Shaders*",
+    "/Documentation~*",
+    "LICENSE*",
+    "README.md*",
+    "*.cs*",
+    "*.asmdef*",
+    "package.json*"
+  ]
+}

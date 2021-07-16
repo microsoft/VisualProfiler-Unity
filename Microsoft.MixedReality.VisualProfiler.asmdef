@@ -1,0 +1,14 @@
+{
+    "name": "Microsoft.MixedReality.VisualProfiler",
+    "rootNamespace": "Microsoft.MixedReality.Profiling",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
