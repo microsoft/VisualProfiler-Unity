@@ -4,7 +4,10 @@
 using System.Text;
 using UnityEngine;
 using UnityEngine.Profiling;
+
+#if UNITY_STANDALONE_WIN || UNITY_WSA
 using UnityEngine.Windows.Speech;
+#endif
 
 #if WINDOWS_UWP
 using Windows.System;
@@ -103,20 +106,28 @@ namespace Microsoft.MixedReality.Profiling
         }
 
         [Header("UI Settings")]
+
         [SerializeField, Tooltip("Voice commands to toggle the profiler on and off.")]
         private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
+
         [SerializeField, Range(0, 3), Tooltip("How many decimal places to display on numeric strings.")]
         private int displayedDecimalDigits = 1;
+
         [SerializeField, Tooltip("The color of the window backplate.")]
         private Color baseColor = new Color(80 / 256.0f, 80 / 256.0f, 80 / 256.0f, 1.0f);
+
         [SerializeField, Tooltip("The color to display on frames which meet or exceed the target frame rate.")]
         private Color targetFrameRateColor = new Color(127 / 256.0f, 186 / 256.0f, 0 / 256.0f, 1.0f);
+
         [SerializeField, Tooltip("The color to display on frames which fall below the target frame rate.")]
         private Color missedFrameRateColor = new Color(242 / 256.0f, 80 / 256.0f, 34 / 256.0f, 1.0f);
+
         [SerializeField, Tooltip("The color to display for current memory usage values.")]
         private Color memoryUsedColor = new Color(0 / 256.0f, 164 / 256.0f, 239 / 256.0f, 1.0f);
+
         [SerializeField, Tooltip("The color to display for peak (aka max) memory usage values.")]
         private Color memoryPeakColor = new Color(255 / 256.0f, 185 / 256.0f, 0 / 256.0f, 1.0f);
+
         [SerializeField, Tooltip("The color to display for the platforms memory usage limit.")]
         private Color memoryLimitColor = new Color(150 / 256.0f, 150 / 256.0f, 150 / 256.0f, 1.0f);
 
@@ -148,8 +159,6 @@ namespace Microsoft.MixedReality.Profiling
         private ulong memoryUsage;
         private ulong peakMemoryUsage;
         private ulong limitMemoryUsage;
-
-        private KeywordRecognizer keywordRecognizer;
 
         // Rendering resources.
         [SerializeField, HideInInspector]
@@ -227,15 +236,20 @@ namespace Microsoft.MixedReality.Profiling
             Reset();
             BuildWindow();
             BuildFrameRateStrings();
+
+#if UNITY_STANDALONE_WIN || UNITY_WSA
             BuildKeywordRecognizer();
+#endif
         }
 
         private void OnDestroy()
         {
+#if UNITY_STANDALONE_WIN || UNITY_WSA
             if (keywordRecognizer.IsRunning)
             {
                 keywordRecognizer.Stop();
             }
+#endif
 
             Destroy(window);
         }
@@ -507,6 +521,9 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
+#if UNITY_STANDALONE_WIN || UNITY_WSA
+        private KeywordRecognizer keywordRecognizer;
+
         private void BuildKeywordRecognizer()
         {
             keywordRecognizer = new KeywordRecognizer(toggleKeyworlds);
@@ -534,6 +551,7 @@ namespace Microsoft.MixedReality.Profiling
                 }
             }
         }
+#endif
 
         private static Transform CreateAnchor(string name, Transform parent)
         {
