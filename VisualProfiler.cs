@@ -194,6 +194,12 @@ namespace Microsoft.MixedReality.Profiling
 
         private const int instanceCount = peakMemoryTextOffset + maxStringLength;
 
+        private static readonly int colorID = Shader.PropertyToID("_Color");
+        private static readonly int baseColorID = Shader.PropertyToID("_BaseColor");
+        private static readonly int fontScaleID = Shader.PropertyToID("_FontScale");
+        private static readonly int uvOffsetScaleXID = Shader.PropertyToID("_UVOffsetScaleX");
+        private static readonly int windowLocalToWorldID = Shader.PropertyToID("_WindowLocalToWorldMatrix");
+
         // Pre computed state.
         private char[][] frameRateStrings = new char[maxTargetFrameRate + 1][];
         private char[][] gpuFrameRateStrings = new char[maxTargetFrameRate + 1][];
@@ -245,9 +251,6 @@ namespace Microsoft.MixedReality.Profiling
         private Vector4[] instanceUVOffsetScaleX = new Vector4[instanceCount];
         private bool instanceColorsDirty = false;
         private bool instanceUVOffsetScaleXDirty = false;
-        private int colorID = 0;
-        private int uvOffsetScaleXID = 0;
-        private int windowLocalToWorldID = 0;
 
         private void OnEnable()
         {
@@ -267,9 +270,6 @@ namespace Microsoft.MixedReality.Profiling
                 Destroy(quadMeshFilter.gameObject);
             }
 
-            colorID = Shader.PropertyToID("_Color");
-            uvOffsetScaleXID = Shader.PropertyToID("_UVOffsetScaleX");
-            windowLocalToWorldID = Shader.PropertyToID("_WindowLocalToWorldMatrix");
             instancePropertyBlock = new MaterialPropertyBlock();
 
             Vector2 defaultWindowRotation = new Vector2(10.0f, 20.0f);
@@ -298,6 +298,7 @@ namespace Microsoft.MixedReality.Profiling
             if (keywordRecognizer != null && keywordRecognizer.IsRunning)
             {
                 keywordRecognizer.Stop();
+                keywordRecognizer = null;
             }
 #endif
             verticesRecorder.Dispose();
@@ -590,9 +591,9 @@ namespace Microsoft.MixedReality.Profiling
 
             if (instancePropertyBlock != null && material != null && material.mainTexture != null)
             {
-                instancePropertyBlock.SetVector("_BaseColor", baseColor);
-                instancePropertyBlock.SetVector("_FontScale", new Vector2((float)fontCharacterSize.x / material.mainTexture.width,
-                                                                          (float)fontCharacterSize.y / material.mainTexture.height));
+                instancePropertyBlock.SetVector(baseColorID, baseColor);
+                instancePropertyBlock.SetVector(fontScaleID, new Vector2((float)fontCharacterSize.x / material.mainTexture.width,
+                                                                         (float)fontCharacterSize.y / material.mainTexture.height));
             }
         }
 
