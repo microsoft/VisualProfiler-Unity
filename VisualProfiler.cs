@@ -36,7 +36,7 @@ namespace Microsoft.MixedReality.Profiling
     public class VisualProfiler : MonoBehaviour
     {
         [Header("Profiler Settings")]
-        [SerializeField, Tooltip("Is the profiler currently visible? If disabled prevents the profiler from rendering but still allows it to track memory usage.")]
+        [SerializeField, Tooltip("Is the profiler currently visible? If disabled, prevents the profiler from rendering but still allows it to track memory usage.")]
         private bool isVisible = true;
 
         public bool IsVisible
