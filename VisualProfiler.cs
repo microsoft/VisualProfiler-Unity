@@ -175,9 +175,9 @@ namespace Microsoft.MixedReality.Profiling
         private const int gpuframeRateTextOffset = cpuframeRateTextOffset + maxStringLength;
 
         private const int drawCallTextOffset = gpuframeRateTextOffset + maxStringLength;
-        private const int verticiesTextOffset = drawCallTextOffset + maxStringLength;
+        private const int verticesTextOffset = drawCallTextOffset + maxStringLength;
 
-        private const int usedMemoryTextOffset = verticiesTextOffset + maxStringLength;
+        private const int usedMemoryTextOffset = verticesTextOffset + maxStringLength;
         private const int limitMemoryTextOffset = usedMemoryTextOffset + maxStringLength;
         private const int peakMemoryTextOffset = limitMemoryTextOffset + maxStringLength;
 
@@ -203,7 +203,7 @@ namespace Microsoft.MixedReality.Profiling
         private TextData gpuFrameRateText = null;
 
         private TextData drawCallText = null;
-        private TextData verticiesText = null;
+        private TextData verticesText = null;
 
         private TextData usedMemoryText = null;
         private TextData peakMemoryText = null;
@@ -419,7 +419,7 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     if (WillDisplayedVertexCountDiffer(lastVertexCount, vertexCount, displayedDecimalDigits))
                     {
-                        VertexCountToString(stringBuffer, displayedDecimalDigits, verticiesText, lastVertexCount);
+                        VertexCountToString(stringBuffer, displayedDecimalDigits, verticesText, lastVertexCount);
                     }
 
                     vertexCount = lastVertexCount;
@@ -554,8 +554,8 @@ namespace Microsoft.MixedReality.Profiling
                 float height = 0.0045f;
                 drawCallText = new TextData(new Vector3(-edgeX, height, 0.0f), false, drawCallTextOffset, "Draw Calls: ");
                 LayoutText(drawCallText);
-                verticiesText = new TextData(new Vector3(edgeX, height, 0.0f), true, verticiesTextOffset, "Verts: ");
-                LayoutText(verticiesText);
+                verticesText = new TextData(new Vector3(edgeX, height, 0.0f), true, verticesTextOffset, "Verts: ");
+                LayoutText(verticesText);
             }
 
             // Add memory usage bars.
@@ -968,11 +968,9 @@ namespace Microsoft.MixedReality.Profiling
 
         private static bool WillDisplayedVertexCountDiffer(long oldCount, long newCount, int displayedDecimalDigits)
         {
-            float oldCountK = oldCount / 1000.0f;
-            float newCountK = newCount / 1000.0f;
-            float decimalPower = Mathf.Pow(10.0f, displayedDecimalDigits);
+            float decimalPower = Mathf.Pow(10.0f, displayedDecimalDigits) / 1000.0f;
 
-            return (int)(oldCountK * decimalPower) != (int)(newCountK * decimalPower);
+            return (int)(oldCount * decimalPower) != (int)(newCount * decimalPower);
         }
 
         private static bool WillDisplayedMemoryUsageDiffer(ulong oldUsage, ulong newUsage, int displayedDecimalDigits)
