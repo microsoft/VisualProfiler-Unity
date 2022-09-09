@@ -13,7 +13,7 @@
   "author": "Microsoft",
   "license": "MIT",
   "files": [
-    "/Shaders*",
+    "/Data*",
     "/Documentation~*",
     "LICENSE*",
     "README.md*",
