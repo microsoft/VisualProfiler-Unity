@@ -42,18 +42,7 @@ namespace Microsoft.MixedReality.Profiling
         public bool IsVisible
         {
             get { return isVisible; }
-            set
-            {
-                if (isVisible != value)
-                {
-                    isVisible = value;
-
-                    if (isVisible)
-                    {
-                        Refresh();
-                    }
-                }
-            }
+            set { isVisible = value; }
         }
 
         [SerializeField, Tooltip("The amount of time, in seconds, to collect frames for frame rate calculation.")]
@@ -234,6 +223,7 @@ namespace Microsoft.MixedReality.Profiling
         private ulong memoryUsage = 0;
         private ulong peakMemoryUsage = 0;
         private ulong limitMemoryUsage = 0;
+        private bool peakMemoryUsageDirty = false;
 
         // Profiling state.
         private int frameCount = 0;
@@ -251,6 +241,21 @@ namespace Microsoft.MixedReality.Profiling
         private Vector4[] instanceUVOffsetScaleX = new Vector4[instanceCount];
         private bool instanceColorsDirty = false;
         private bool instanceUVOffsetScaleXDirty = false;
+
+        /// <summary>
+        /// Reset any stats the profiler is tracking. Call this if you would like to restart tracking 
+        /// statistics like peak memory usage.
+        /// </summary>
+        public void Refresh()
+        {
+            cpuFrameRate = -1;
+            gpuFrameRate = -1;
+            drawCalls = 0;
+            vertexCount = 0;
+            memoryUsage = 0;
+            peakMemoryUsage = 0;
+            limitMemoryUsage = 0;
+        }
 
         private void OnEnable()
         {
@@ -298,6 +303,7 @@ namespace Microsoft.MixedReality.Profiling
             if (keywordRecognizer != null && keywordRecognizer.IsRunning)
             {
                 keywordRecognizer.Stop();
+                keywordRecognizer.Dispose();
                 keywordRecognizer = null;
             }
 #endif
@@ -307,7 +313,6 @@ namespace Microsoft.MixedReality.Profiling
 
         private void OnValidate()
         {
-            Refresh();
             BuildWindow();
         }
 
@@ -419,26 +424,23 @@ namespace Microsoft.MixedReality.Profiling
 
                     vertexCount = lastVertexCount;
                 }
-            }
 
-            // Update memory statistics.
-            ulong limit = AppMemoryUsageLimit;
+                // Update memory statistics.
+                ulong limit = AppMemoryUsageLimit;
 
-            if (limit != limitMemoryUsage)
-            {
-                if (IsVisible && WillDisplayedMemoryUsageDiffer(limitMemoryUsage, limit, displayedDecimalDigits))
+                if (limit != limitMemoryUsage)
                 {
-                    MemoryUsageToString(stringBuffer, displayedDecimalDigits, limitMemoryText, limit, Color.white);
+                    if (WillDisplayedMemoryUsageDiffer(limitMemoryUsage, limit, displayedDecimalDigits))
+                    {
+                        MemoryUsageToString(stringBuffer, displayedDecimalDigits, limitMemoryText, limit, Color.white);
+                    }
+
+                    limitMemoryUsage = limit;
                 }
 
-                limitMemoryUsage = limit;
-            }
+                ulong usage = AppMemoryUsage;
 
-            ulong usage = AppMemoryUsage;
-
-            if (usage != memoryUsage)
-            {
-                if (IsVisible)
+                if (usage != memoryUsage)
                 {
                     Vector4 offsetScale = instanceUVOffsetScaleX[usedInstanceOffset];
                     offsetScale.z = -1.0f + (float)usage / limitMemoryUsage;
@@ -449,14 +451,11 @@ namespace Microsoft.MixedReality.Profiling
                     {
                         MemoryUsageToString(stringBuffer, displayedDecimalDigits, usedMemoryText, usage, memoryUsedColor);
                     }
+
+                    memoryUsage = usage;
                 }
 
-                memoryUsage = usage;
-            }
-
-            if (memoryUsage > peakMemoryUsage)
-            {
-                if (IsVisible)
+                if (memoryUsage > peakMemoryUsage || peakMemoryUsageDirty)
                 {
                     Vector4 offsetScale = instanceUVOffsetScaleX[peakInstanceOffset];
                     offsetScale.z = -1.0f + (float)memoryUsage / limitMemoryUsage;
@@ -467,14 +466,12 @@ namespace Microsoft.MixedReality.Profiling
                     {
                         MemoryUsageToString(stringBuffer, displayedDecimalDigits, peakMemoryText, memoryUsage, memoryPeakColor);
                     }
+
+                    peakMemoryUsage = memoryUsage;
+                    peakMemoryUsageDirty = false;
                 }
 
-                peakMemoryUsage = memoryUsage;
-            }
-
-            // Render.
-            if (IsVisible)
-            {
+                // Render.
                 Matrix4x4 windowLocalToWorldMatrix = Matrix4x4.TRS(windowPosition, windowRotation, Vector3.one * windowScale);
                 instancePropertyBlock.SetMatrix(windowLocalToWorldID, windowLocalToWorldMatrix);
 
@@ -493,6 +490,17 @@ namespace Microsoft.MixedReality.Profiling
                 if (material != null)
                 {
                     Graphics.DrawMeshInstanced(quadMesh, 0, material, instanceMatrices, instanceMatrices.Length, instancePropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false);
+                }
+            }
+            else
+            {
+                // Keep tracking peak memory usage when not visible.
+                ulong usage = AppMemoryUsage;
+
+                if (usage > peakMemoryUsage)
+                {
+                    peakMemoryUsage = usage;
+                    peakMemoryUsageDirty = true;
                 }
             }
         }
@@ -595,6 +603,8 @@ namespace Microsoft.MixedReality.Profiling
                 instancePropertyBlock.SetVector(fontScaleID, new Vector2((float)fontCharacterSize.x / material.mainTexture.width,
                                                                          (float)fontCharacterSize.y / material.mainTexture.height));
             }
+
+            Refresh();
         }
 
         private void BuildFrameRateStrings()
@@ -655,17 +665,6 @@ namespace Microsoft.MixedReality.Profiling
                     characterUVs[c] = new Vector4(x, 1.0f - height - y, 0.0f, 0.0f);
                 }
             }
-        }
-
-        private void Refresh()
-        {
-            cpuFrameRate = -1;
-            gpuFrameRate = -1;
-            drawCalls = 0;
-            vertexCount = 0;
-            memoryUsage = 0;
-            peakMemoryUsage = 0;
-            limitMemoryUsage = 0;
         }
 
         private Vector3 CalculateWindowPosition(Transform cameraTransform)
@@ -768,7 +767,6 @@ namespace Microsoft.MixedReality.Profiling
         private void OnPhraseRecognized(PhraseRecognizedEventArgs args)
         {
             IsVisible = !IsVisible;
-            Refresh();
         }
 #endif
 

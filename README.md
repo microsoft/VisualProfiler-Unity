@@ -1,13 +1,13 @@
 # Visual Profiler
 
-The Visual Profiler provides a drop in solution for viewing your Mixed Reality Unity application's frame rate, scene complexity, and memory usage.
+The Visual Profiler provides a drop in solution for viewing your mixed reality Unity application's frame rate, scene complexity, and memory usage across a variety of platforms.
 
 ![Visual Profiler Screenshot](Documentation~/Images/ProfilerScreenshot.png)
 
 Missed frames are displayed over time to visually find problem areas. Scene complexity is reported in the form of draw calls and rendered vertex counts. Memory is reported as current, peak and max usage in a bar graph.
 
 > [!NOTE]
-> To ensure the profiler is minimally intrusive it does not do per frame allocations and renders in a single draw call.
+> To ensure the profiler is minimally intrusive it does not create any game objects, perform any per frame managed allocations, and renders in a single draw call.
 
 The Visual Profiler has been verified to work on the following platforms:
 
@@ -54,6 +54,9 @@ When using the profiler look for "missed frames" which appear as orange bars. Mi
 ![Profiler Guide](Documentation~/Images/ProfilerGuide.png)
 
 One should also keep an eye on the bottom memory bar to insure memory usage isn't rapidly changing or approaching the application's memory limit.
+
+> [!NOTE]
+> The Visual Profiler works in both development and release builds.
 
 The profiler UI (such as anchoring, scale, follow behavior and UI color) can also be tweaked in the component inspector.
 
