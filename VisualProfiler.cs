@@ -18,7 +18,7 @@ namespace Microsoft.MixedReality.Profiling
 {
     /// <summary>
     /// 
-    /// ABOUT: The VisualProfiler provides a drop in solution for viewing  your Mixed Reality 
+    /// ABOUT: The VisualProfiler provides a drop in solution for viewing your Mixed Reality 
     /// Unity application's frame rate and memory usage. Missed frames are displayed over time to 
     /// visually find problem areas. Draw calls and vertex counts are displayed to diagnose scene 
     /// complexity. Memory is reported as current, peak and max usage in a bar graph.
