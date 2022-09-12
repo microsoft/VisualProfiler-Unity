@@ -362,8 +362,8 @@ namespace Microsoft.MixedReality.Profiling
                     {
                         float cpuFrameTime, gpuFrameTime;
                         AverageFrameTiming(frameTimings, frameTimingsCount, out cpuFrameTime, out gpuFrameTime);
-                        lastCpuFrameRate = (int)(1.0f / (cpuFrameTime / frameCount));
-                        lastGpuFrameRate = (int)(1.0f / (gpuFrameTime / frameCount));
+                        lastCpuFrameRate = (int)(1.0f / cpuFrameTime);
+                        lastGpuFrameRate = (int)(1.0f / gpuFrameTime);
                     }
 
                     lastCpuFrameRate = Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate);
@@ -640,7 +640,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (i == (frameRateStrings.Length - 1))
                 {
-                    stringBuilder.Append('+');
+                    stringBuilder.Append('-');
                 }
 
                 gpuFrameRateStrings[i] = ToCharArray(stringBuilder);
@@ -919,7 +919,10 @@ namespace Microsoft.MixedReality.Profiling
             get
             {
                 // If the current XR SDK does not report refresh rate information, assume 60Hz.
-                float refreshRate = UnityEngine.XR.XRDevice.refreshRate;
+                float refreshRate = 0;
+#if ENABLE_VR
+                refreshRate = UnityEngine.XR.XRDevice.refreshRate;
+#endif
                 return ((int)refreshRate == 0) ? 60.0f : refreshRate;
             }
         }
