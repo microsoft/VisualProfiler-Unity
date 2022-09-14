@@ -229,7 +229,6 @@ namespace Microsoft.MixedReality.Profiling
         private float accumulatedFrameTimeCPU = 0.0f;
         private float accumulatedFrameTimeGPU = 0.0f;
         private FrameTiming[] frameTimings = new FrameTiming[1];
-
         private ProfilerRecorder drawCallsRecorder;
         private ProfilerRecorder verticesRecorder;
 

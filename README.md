@@ -7,7 +7,7 @@ The Visual Profiler provides a drop in solution for viewing your mixed reality U
 Missed frames are displayed over time to visually find problem areas. Scene complexity is reported in the form of draw calls and rendered vertex counts. Memory is reported as current, peak and max usage in a bar graph.
 
 > [!NOTE]
-> To ensure the profiler is minimally intrusive it does not create any game objects, perform any per frame managed allocations, and renders in a single draw call.
+> To ensure the profiler is minimally intrusive it does not create any GameObjects, perform any per frame managed allocations, and renders in a single draw call.
 
 The Visual Profiler has been verified to work on the following platforms:
 
@@ -23,7 +23,7 @@ The Visual Profiler has been verified to work on the following platforms:
 The Visual Profiler is normally ingested as a Unity [package](https://docs.unity3d.com/Manual/Packages.html). To import the Visual Profiler package into your Unity project follow the below steps:
 
 > [!NOTE]
-> The Visual Profiler package requires Unity 2020.x and above.
+> The Visual Profiler package requires Unity 2020.3 and above.
 
 1. Open your Unity project and select `Window > Package Manager` from the file menu bar
 
