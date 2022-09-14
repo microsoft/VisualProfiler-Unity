@@ -111,22 +111,22 @@ namespace Microsoft.MixedReality.Profiling
         private int displayedDecimalDigits = 1;
 
         [SerializeField, Tooltip("The color of the window backplate.")]
-        private Color baseColor = new Color(50 / 256.0f, 50 / 256.0f, 50 / 256.0f, 1.0f);
+        private Color baseColor = new Color(50 / 255.0f, 50 / 255.0f, 50 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display on frames which meet or exceed the target frame rate.")]
-        private Color targetFrameRateColor = new Color(127 / 256.0f, 186 / 256.0f, 0 / 256.0f, 1.0f);
+        private Color targetFrameRateColor = new Color(127 / 255.0f, 186 / 255.0f, 0 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display on frames which fall below the target frame rate.")]
-        private Color missedFrameRateColor = new Color(242 / 256.0f, 80 / 256.0f, 34 / 256.0f, 1.0f);
+        private Color missedFrameRateColor = new Color(255 / 255.0f, 0 / 255.0f, 0 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display for current memory usage values.")]
-        private Color memoryUsedColor = new Color(0 / 256.0f, 164 / 256.0f, 239 / 256.0f, 1.0f);
+        private Color memoryUsedColor = new Color(0 / 255.0f, 164 / 255.0f, 239 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display for peak (aka max) memory usage values.")]
-        private Color memoryPeakColor = new Color(255 / 256.0f, 185 / 256.0f, 0 / 256.0f, 1.0f);
+        private Color memoryPeakColor = new Color(255 / 255.0f, 185 / 255.0f, 0 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display for the platforms memory usage limit.")]
-        private Color memoryLimitColor = new Color(100 / 256.0f, 100 / 256.0f, 100 / 256.0f, 1.0f);
+        private Color memoryLimitColor = new Color(100 / 255.0f, 100 / 255.0f, 100 / 255.0f, 1.0f);
 
         [Header("Font Settings")]
         [SerializeField, Tooltip("The width and height of a mono spaced character in the font texture (in pixels).")]
@@ -238,8 +238,10 @@ namespace Microsoft.MixedReality.Profiling
         private MaterialPropertyBlock instancePropertyBlock;
         private Matrix4x4[] instanceMatrices = new Matrix4x4[instanceCount];
         private Vector4[] instanceColors = new Vector4[instanceCount];
+        private Vector4[] instanceBaseColors = new Vector4[instanceCount];
         private Vector4[] instanceUVOffsetScaleX = new Vector4[instanceCount];
         private bool instanceColorsDirty = false;
+        private bool instanceBaseColorsDirty = false;
         private bool instanceUVOffsetScaleXDirty = false;
 
         /// <summary>
@@ -369,13 +371,16 @@ namespace Microsoft.MixedReality.Profiling
                     lastCpuFrameRate = Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate);
                     lastGpuFrameRate = Mathf.Clamp(lastGpuFrameRate, 0, maxTargetFrameRate);
 
-                    Color cpuFrameColor = (lastCpuFrameRate < ((int)(AppFrameRate) - 1)) ? missedFrameRateColor : targetFrameRateColor;
+                    // TODO: Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
+                    bool missedFrame = lastCpuFrameRate < ((int)(AppFrameRate) - 1);
+                    Color frameColor = missedFrame ? missedFrameRateColor : targetFrameRateColor;
+                    Vector4 frameIcon = missedFrame ? characterUVs['!'] : characterUVs[' '];
 
                     // Update frame rate text.
                     if (lastCpuFrameRate != cpuFrameRate)
                     {
                         char[] text = frameRateStrings[Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate)];
-                        SetText(cpuFrameRateText, text, text.Length, cpuFrameColor);
+                        SetText(cpuFrameRateText, text, text.Length, frameColor);
                         cpuFrameRate = lastCpuFrameRate;
                     }
 
@@ -387,15 +392,20 @@ namespace Microsoft.MixedReality.Profiling
                         gpuFrameRate = lastGpuFrameRate;
                     }
 
-                    // Animate frame colors.
-                    // TODO: Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
+                    // Animate frame colors and icons.
                     for (int i = frameRange - 1; i > 0; --i)
                     {
-                        instanceColors[framesInstanceOffset + i] = instanceColors[framesInstanceOffset + i - 1];
+                        int write = framesInstanceOffset + i;
+                        int read = framesInstanceOffset + i - 1;
+                        instanceBaseColors[write] = instanceBaseColors[read];
+                        instanceUVOffsetScaleX[write] = instanceUVOffsetScaleX[read];
                     }
 
-                    instanceColors[framesInstanceOffset + 0] = cpuFrameColor;
-                    instanceColorsDirty = true;
+                    instanceBaseColors[framesInstanceOffset + 0] = frameColor;
+                    instanceUVOffsetScaleX[framesInstanceOffset + 0] = frameIcon;
+
+                    instanceBaseColorsDirty = true;
+                    instanceUVOffsetScaleXDirty = true;
 
                     // Reset timers.
                     frameCount = 0;
@@ -481,6 +491,12 @@ namespace Microsoft.MixedReality.Profiling
                     instanceColorsDirty = false;
                 }
 
+                if (instanceBaseColorsDirty)
+                {
+                    instancePropertyBlock.SetVectorArray(baseColorID, instanceBaseColors);
+                    instanceBaseColorsDirty = false;
+                }
+
                 if (instanceUVOffsetScaleXDirty)
                 {
                     instancePropertyBlock.SetVectorArray(uvOffsetScaleXID, instanceUVOffsetScaleX);
@@ -510,17 +526,23 @@ namespace Microsoft.MixedReality.Profiling
             BuildFrameRateStrings();
             BuildCharacterUVs();
 
-            // White space is the bottom right of the font texture.
-            Vector4 whiteSpaceUV = new Vector4(0.99f, 1.0f - 0.99f, 0.0f, 0.0f);
+            Vector4 spaceUV = characterUVs[' '];
 
             Vector3 defaultWindowSize = new Vector3(0.2f, 0.04f, 1.0f);
             float edgeX = defaultWindowSize.x * 0.5f;
+
+            // Set the default base color.
+            for (int i = 0; i < instanceBaseColors.Length; ++i)
+            {
+                instanceBaseColors[i] = baseColor;
+            }
 
             // Add a window back plate.
             {
                 instanceMatrices[backplateInstanceOffset] = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, defaultWindowSize);
                 instanceColors[backplateInstanceOffset] = baseColor;
-                instanceUVOffsetScaleX[backplateInstanceOffset] = whiteSpaceUV;
+                instanceBaseColors[backplateInstanceOffset] = baseColor;
+                instanceUVOffsetScaleX[backplateInstanceOffset] = spaceUV;
             }
 
             // Add frame rate text.
@@ -544,8 +566,9 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     instanceMatrices[framesInstanceOffset + i] = Matrix4x4.TRS(position, Quaternion.identity, new Vector3(scale.x * 0.8f, scale.y * 0.8f, scale.z));
                     position.x += scale.x;
-                    instanceColors[framesInstanceOffset + i] = targetFrameRateColor;
-                    instanceUVOffsetScaleX[framesInstanceOffset + i] = whiteSpaceUV;
+                    instanceColors[framesInstanceOffset + i] = Color.white;
+                    instanceBaseColors[framesInstanceOffset + i] = targetFrameRateColor;
+                    instanceUVOffsetScaleX[framesInstanceOffset + i] = spaceUV;
                 }
             }
 
@@ -568,17 +591,20 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     instanceMatrices[limitInstanceOffset] = Matrix4x4.TRS(position, Quaternion.identity, scale);
                     instanceColors[limitInstanceOffset] = memoryLimitColor;
-                    instanceUVOffsetScaleX[limitInstanceOffset] = whiteSpaceUV;
+                    instanceBaseColors[limitInstanceOffset] = memoryLimitColor;
+                    instanceUVOffsetScaleX[limitInstanceOffset] = spaceUV;
                 }
                 {
                     instanceMatrices[peakInstanceOffset] = Matrix4x4.TRS(position, Quaternion.identity, scale);
                     instanceColors[peakInstanceOffset] = memoryPeakColor;
-                    instanceUVOffsetScaleX[peakInstanceOffset] = whiteSpaceUV;
+                    instanceBaseColors[peakInstanceOffset] = memoryPeakColor;
+                    instanceUVOffsetScaleX[peakInstanceOffset] = spaceUV;
                 }
                 {
                     instanceMatrices[usedInstanceOffset] = Matrix4x4.TRS(position, Quaternion.identity, scale);
                     instanceColors[usedInstanceOffset] = memoryUsedColor;
-                    instanceUVOffsetScaleX[usedInstanceOffset] = whiteSpaceUV;
+                    instanceBaseColors[usedInstanceOffset] = memoryUsedColor;
+                    instanceUVOffsetScaleX[usedInstanceOffset] = spaceUV;
                 }
             }
 
@@ -593,13 +619,13 @@ namespace Microsoft.MixedReality.Profiling
                 LayoutText(limitMemoryText);
             }
 
-            // Initialize property block state.
             instanceColorsDirty = true;
+            instanceBaseColorsDirty = true;
             instanceUVOffsetScaleXDirty = true;
 
+            // Initialize property block state.
             if (instancePropertyBlock != null && material != null && material.mainTexture != null)
             {
-                instancePropertyBlock.SetVector(baseColorID, baseColor);
                 instancePropertyBlock.SetVector(fontScaleID, new Vector2((float)fontCharacterSize.x / material.mainTexture.width,
                                                                          (float)fontCharacterSize.y / material.mainTexture.height));
             }
