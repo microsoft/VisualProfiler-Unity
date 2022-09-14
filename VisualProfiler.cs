@@ -159,7 +159,6 @@ namespace Microsoft.MixedReality.Profiling
         // Constants.
         private const int maxStringLength = 17;
         private const int maxTargetFrameRate = 240;
-        private const int maxFrameTimings = 128;
         private const int frameRange = 30;
 
         // These offsets specify how many instances a portion of the UI uses as well as draw order. 
@@ -227,8 +226,9 @@ namespace Microsoft.MixedReality.Profiling
 
         // Profiling state.
         private int frameCount = 0;
-        private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-        private FrameTiming[] frameTimings = new FrameTiming[maxFrameTimings];
+        private float accumulatedFrameTimeCPU = 0.0f;
+        private float accumulatedFrameTimeGPU = 0.0f;
+        private FrameTiming[] frameTimings = new FrameTiming[1];
 
         private ProfilerRecorder drawCallsRecorder;
         private ProfilerRecorder verticesRecorder;
@@ -267,7 +267,7 @@ namespace Microsoft.MixedReality.Profiling
             }
 
             // Create a quad mesh with artificially large bounds to disable culling for instanced rendering.
-            // TODO: Use shared mesh with normal bounds once Unity allows for more control over instance culling.
+            // TODO - [Cameron-Micka] Use shared mesh with normal bounds once Unity allows for more control over instance culling.
             if (quadMesh == null)
             {
                 MeshFilter quadMeshFilter = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshFilter>();
@@ -288,9 +288,6 @@ namespace Microsoft.MixedReality.Profiling
 
             drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
             verticesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Vertices Count");
-
-            stopwatch.Reset();
-            stopwatch.Start();
 
             BuildWindow();
 
@@ -344,34 +341,33 @@ namespace Microsoft.MixedReality.Profiling
                     }
                 }
 
-                // Capture frame timings every frame and read from it depending on the frameSampleRate.
+                // Many platforms do not yet support the FrameTimingManager. When timing data is returned from the FrameTimingManager we will use
+                // its timing data, else we will depend on the deltaTime. Wider support is coming in Unity 2022.1+
+                // https://blog.unity.com/technology/detecting-performance-bottlenecks-with-unity-frame-timing-manager
                 FrameTimingManager.CaptureFrameTimings();
+                uint frameTimingsCount = FrameTimingManager.GetLatestTimings(1, frameTimings);
+
+                if (frameTimingsCount != 0)
+                {
+                    accumulatedFrameTimeCPU += (float)(frameTimings[0].cpuFrameTime * 0.001f);
+                    accumulatedFrameTimeGPU += (float)(frameTimings[0].gpuFrameTime * 0.001f);
+                }
+                else
+                {
+                    accumulatedFrameTimeCPU += Time.unscaledDeltaTime;
+                    // No GPU time to query.
+                }
 
                 ++frameCount;
-                float elapsedSeconds = stopwatch.ElapsedMilliseconds * 0.001f;
 
-                if (elapsedSeconds >= frameSampleRate)
+                if (accumulatedFrameTimeCPU >= frameSampleRate)
                 {
-                    int lastCpuFrameRate = (int)(1.0f / (elapsedSeconds / frameCount));
-                    int lastGpuFrameRate = 0;
-
-                    // Many platforms do not yet support the FrameTimingManager. When timing data is returned from the FrameTimingManager we will use
-                    // its timing data, else we will depend on the stopwatch. Wider support is coming in Unity 2022.1+
-                    // https://blog.unity.com/technology/detecting-performance-bottlenecks-with-unity-frame-timing-manager
-                    uint frameTimingsCount = FrameTimingManager.GetLatestTimings((uint)Mathf.Min(frameCount, maxFrameTimings), frameTimings);
-
-                    if (frameTimingsCount != 0)
-                    {
-                        float cpuFrameTime, gpuFrameTime;
-                        AverageFrameTiming(frameTimings, frameTimingsCount, out cpuFrameTime, out gpuFrameTime);
-                        lastCpuFrameRate = (int)(1.0f / cpuFrameTime);
-                        lastGpuFrameRate = (int)(1.0f / gpuFrameTime);
-                    }
-
+                    int lastCpuFrameRate = (int)(1.0f / (accumulatedFrameTimeCPU / frameCount));
+                    int lastGpuFrameRate = (int)(1.0f / (accumulatedFrameTimeGPU / frameCount));
                     lastCpuFrameRate = Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate);
                     lastGpuFrameRate = Mathf.Clamp(lastGpuFrameRate, 0, maxTargetFrameRate);
 
-                    // TODO: Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
+                    // TODO - [Cameron-Micka] Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
                     bool missedFrame = lastCpuFrameRate < ((int)(AppFrameRate) - 1);
                     Color frameColor = missedFrame ? missedFrameRateColor : targetFrameRateColor;
                     Vector4 frameIcon = missedFrame ? characterUVs['X'] : characterUVs[' '];
@@ -409,8 +405,8 @@ namespace Microsoft.MixedReality.Profiling
 
                     // Reset timers.
                     frameCount = 0;
-                    stopwatch.Reset();
-                    stopwatch.Start();
+                    accumulatedFrameTimeCPU -= frameSampleRate;
+                    accumulatedFrameTimeGPU = 0.0f;
                 }
 
                 // Update scene statistics.
@@ -652,21 +648,27 @@ namespace Microsoft.MixedReality.Profiling
                     ms = milisecondStringBuilder.ToString();
                 }
 
-                stringBuilder.AppendFormat("{0}fps ({1}ms)", frame, ms);
-
                 if (i == (frameRateStrings.Length - 1))
                 {
-                    stringBuilder.Append('+');
+                    stringBuilder.AppendFormat(">{0}fps ({1}ms)", frame, ms);
+                }
+                else
+                {
+                    stringBuilder.AppendFormat("{0}fps ({1}ms)", frame, ms);
                 }
 
                 frameRateStrings[i] = ToCharArray(stringBuilder);
 
                 stringBuilder.Length = 0;
-                stringBuilder.AppendFormat("GPU: {1}ms", frame, ms);
+                
 
                 if (i == (frameRateStrings.Length - 1))
                 {
-                    stringBuilder.Append('-');
+                    stringBuilder.AppendFormat("GPU: <{1}ms", frame, ms);
+                }
+                else
+                {
+                    stringBuilder.AppendFormat("GPU: {1}ms", frame, ms);
                 }
 
                 gpuFrameRateStrings[i] = ToCharArray(stringBuilder);
@@ -951,24 +953,6 @@ namespace Microsoft.MixedReality.Profiling
 #endif
                 return ((int)refreshRate == 0) ? 60.0f : refreshRate;
             }
-        }
-
-        private static void AverageFrameTiming(FrameTiming[] frameTimings, uint frameTimingsCount, out float cpuFrameTime, out float gpuFrameTime)
-        {
-            double cpuTime = 0.0f;
-            double gpuTime = 0.0f;
-
-            for (int i = 0; i < frameTimingsCount; ++i)
-            {
-                cpuTime += frameTimings[i].cpuFrameTime;
-                gpuTime += frameTimings[i].gpuFrameTime;
-            }
-
-            cpuTime /= frameTimingsCount;
-            gpuTime /= frameTimingsCount;
-
-            cpuFrameTime = (float)(cpuTime * 0.001);
-            gpuFrameTime = (float)(gpuTime * 0.001);
         }
 
         private static ulong AppMemoryUsage
