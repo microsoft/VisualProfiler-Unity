@@ -117,7 +117,7 @@ namespace Microsoft.MixedReality.Profiling
         private Color targetFrameRateColor = new Color(127 / 255.0f, 186 / 255.0f, 0 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display on frames which fall below the target frame rate.")]
-        private Color missedFrameRateColor = new Color(255 / 255.0f, 0 / 255.0f, 0 / 255.0f, 1.0f);
+        private Color missedFrameRateColor = new Color(242 / 255.0f, 80 / 255.0f, 34 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display for current memory usage values.")]
         private Color memoryUsedColor = new Color(0 / 255.0f, 164 / 255.0f, 239 / 255.0f, 1.0f);
@@ -374,7 +374,7 @@ namespace Microsoft.MixedReality.Profiling
                     // TODO: Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
                     bool missedFrame = lastCpuFrameRate < ((int)(AppFrameRate) - 1);
                     Color frameColor = missedFrame ? missedFrameRateColor : targetFrameRateColor;
-                    Vector4 frameIcon = missedFrame ? characterUVs['!'] : characterUVs[' '];
+                    Vector4 frameIcon = missedFrame ? characterUVs['X'] : characterUVs[' '];
 
                     // Update frame rate text.
                     if (lastCpuFrameRate != cpuFrameRate)
