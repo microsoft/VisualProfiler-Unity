@@ -111,22 +111,22 @@ namespace Microsoft.MixedReality.Profiling
         private int displayedDecimalDigits = 1;
 
         [SerializeField, Tooltip("The color of the window backplate.")]
-        private Color baseColor = new Color(50 / 256.0f, 50 / 256.0f, 50 / 256.0f, 1.0f);
+        private Color baseColor = new Color(50 / 255.0f, 50 / 255.0f, 50 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display on frames which meet or exceed the target frame rate.")]
-        private Color targetFrameRateColor = new Color(127 / 256.0f, 186 / 256.0f, 0 / 256.0f, 1.0f);
+        private Color targetFrameRateColor = new Color(127 / 255.0f, 186 / 255.0f, 0 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display on frames which fall below the target frame rate.")]
-        private Color missedFrameRateColor = new Color(242 / 256.0f, 80 / 256.0f, 34 / 256.0f, 1.0f);
+        private Color missedFrameRateColor = new Color(242 / 255.0f, 80 / 255.0f, 34 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display for current memory usage values.")]
-        private Color memoryUsedColor = new Color(0 / 256.0f, 164 / 256.0f, 239 / 256.0f, 1.0f);
+        private Color memoryUsedColor = new Color(0 / 255.0f, 164 / 255.0f, 239 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display for peak (aka max) memory usage values.")]
-        private Color memoryPeakColor = new Color(255 / 256.0f, 185 / 256.0f, 0 / 256.0f, 1.0f);
+        private Color memoryPeakColor = new Color(255 / 255.0f, 185 / 255.0f, 0 / 255.0f, 1.0f);
 
         [SerializeField, Tooltip("The color to display for the platforms memory usage limit.")]
-        private Color memoryLimitColor = new Color(100 / 256.0f, 100 / 256.0f, 100 / 256.0f, 1.0f);
+        private Color memoryLimitColor = new Color(100 / 255.0f, 100 / 255.0f, 100 / 255.0f, 1.0f);
 
         [Header("Font Settings")]
         [SerializeField, Tooltip("The width and height of a mono spaced character in the font texture (in pixels).")]
@@ -159,7 +159,6 @@ namespace Microsoft.MixedReality.Profiling
         // Constants.
         private const int maxStringLength = 17;
         private const int maxTargetFrameRate = 240;
-        private const int maxFrameTimings = 128;
         private const int frameRange = 30;
 
         // These offsets specify how many instances a portion of the UI uses as well as draw order. 
@@ -227,9 +226,9 @@ namespace Microsoft.MixedReality.Profiling
 
         // Profiling state.
         private int frameCount = 0;
-        private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-        private FrameTiming[] frameTimings = new FrameTiming[maxFrameTimings];
-
+        private float accumulatedFrameTimeCPU = 0.0f;
+        private float accumulatedFrameTimeGPU = 0.0f;
+        private FrameTiming[] frameTimings = new FrameTiming[1];
         private ProfilerRecorder drawCallsRecorder;
         private ProfilerRecorder verticesRecorder;
 
@@ -238,8 +237,10 @@ namespace Microsoft.MixedReality.Profiling
         private MaterialPropertyBlock instancePropertyBlock;
         private Matrix4x4[] instanceMatrices = new Matrix4x4[instanceCount];
         private Vector4[] instanceColors = new Vector4[instanceCount];
+        private Vector4[] instanceBaseColors = new Vector4[instanceCount];
         private Vector4[] instanceUVOffsetScaleX = new Vector4[instanceCount];
         private bool instanceColorsDirty = false;
+        private bool instanceBaseColorsDirty = false;
         private bool instanceUVOffsetScaleXDirty = false;
 
         /// <summary>
@@ -265,7 +266,7 @@ namespace Microsoft.MixedReality.Profiling
             }
 
             // Create a quad mesh with artificially large bounds to disable culling for instanced rendering.
-            // TODO: Use shared mesh with normal bounds once Unity allows for more control over instance culling.
+            // TODO - [Cameron-Micka] Use shared mesh with normal bounds once Unity allows for more control over instance culling.
             if (quadMesh == null)
             {
                 MeshFilter quadMeshFilter = GameObject.CreatePrimitive(PrimitiveType.Quad).GetComponent<MeshFilter>();
@@ -286,9 +287,6 @@ namespace Microsoft.MixedReality.Profiling
 
             drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
             verticesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Vertices Count");
-
-            stopwatch.Reset();
-            stopwatch.Start();
 
             BuildWindow();
 
@@ -342,40 +340,42 @@ namespace Microsoft.MixedReality.Profiling
                     }
                 }
 
-                // Capture frame timings every frame and read from it depending on the frameSampleRate.
+                // Many platforms do not yet support the FrameTimingManager. When timing data is returned from the FrameTimingManager we will use
+                // its timing data, else we will depend on the deltaTime. Wider support is coming in Unity 2022.1+
+                // https://blog.unity.com/technology/detecting-performance-bottlenecks-with-unity-frame-timing-manager
                 FrameTimingManager.CaptureFrameTimings();
+                uint frameTimingsCount = FrameTimingManager.GetLatestTimings(1, frameTimings);
+
+                if (frameTimingsCount != 0)
+                {
+                    accumulatedFrameTimeCPU += (float)(frameTimings[0].cpuFrameTime * 0.001f);
+                    accumulatedFrameTimeGPU += (float)(frameTimings[0].gpuFrameTime * 0.001f);
+                }
+                else
+                {
+                    accumulatedFrameTimeCPU += Time.unscaledDeltaTime;
+                    // No GPU time to query.
+                }
 
                 ++frameCount;
-                float elapsedSeconds = stopwatch.ElapsedMilliseconds * 0.001f;
 
-                if (elapsedSeconds >= frameSampleRate)
+                if (accumulatedFrameTimeCPU >= frameSampleRate)
                 {
-                    int lastCpuFrameRate = (int)(1.0f / (elapsedSeconds / frameCount));
-                    int lastGpuFrameRate = 0;
-
-                    // Many platforms do not yet support the FrameTimingManager. When timing data is returned from the FrameTimingManager we will use
-                    // its timing data, else we will depend on the stopwatch. Wider support is coming in Unity 2022.1+
-                    // https://blog.unity.com/technology/detecting-performance-bottlenecks-with-unity-frame-timing-manager
-                    uint frameTimingsCount = FrameTimingManager.GetLatestTimings((uint)Mathf.Min(frameCount, maxFrameTimings), frameTimings);
-
-                    if (frameTimingsCount != 0)
-                    {
-                        float cpuFrameTime, gpuFrameTime;
-                        AverageFrameTiming(frameTimings, frameTimingsCount, out cpuFrameTime, out gpuFrameTime);
-                        lastCpuFrameRate = (int)(1.0f / cpuFrameTime);
-                        lastGpuFrameRate = (int)(1.0f / gpuFrameTime);
-                    }
-
+                    int lastCpuFrameRate = (int)(1.0f / (accumulatedFrameTimeCPU / frameCount));
+                    int lastGpuFrameRate = (int)(1.0f / (accumulatedFrameTimeGPU / frameCount));
                     lastCpuFrameRate = Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate);
                     lastGpuFrameRate = Mathf.Clamp(lastGpuFrameRate, 0, maxTargetFrameRate);
 
-                    Color cpuFrameColor = (lastCpuFrameRate < ((int)(AppFrameRate) - 1)) ? missedFrameRateColor : targetFrameRateColor;
+                    // TODO - [Cameron-Micka] Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
+                    bool missedFrame = lastCpuFrameRate < ((int)(AppFrameRate) - 1);
+                    Color frameColor = missedFrame ? missedFrameRateColor : targetFrameRateColor;
+                    Vector4 frameIcon = missedFrame ? characterUVs['X'] : characterUVs[' '];
 
                     // Update frame rate text.
                     if (lastCpuFrameRate != cpuFrameRate)
                     {
                         char[] text = frameRateStrings[Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate)];
-                        SetText(cpuFrameRateText, text, text.Length, cpuFrameColor);
+                        SetText(cpuFrameRateText, text, text.Length, frameColor);
                         cpuFrameRate = lastCpuFrameRate;
                     }
 
@@ -387,20 +387,25 @@ namespace Microsoft.MixedReality.Profiling
                         gpuFrameRate = lastGpuFrameRate;
                     }
 
-                    // Animate frame colors.
-                    // TODO: Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
+                    // Animate frame colors and icons.
                     for (int i = frameRange - 1; i > 0; --i)
                     {
-                        instanceColors[framesInstanceOffset + i] = instanceColors[framesInstanceOffset + i - 1];
+                        int write = framesInstanceOffset + i;
+                        int read = framesInstanceOffset + i - 1;
+                        instanceBaseColors[write] = instanceBaseColors[read];
+                        instanceUVOffsetScaleX[write] = instanceUVOffsetScaleX[read];
                     }
 
-                    instanceColors[framesInstanceOffset + 0] = cpuFrameColor;
-                    instanceColorsDirty = true;
+                    instanceBaseColors[framesInstanceOffset + 0] = frameColor;
+                    instanceUVOffsetScaleX[framesInstanceOffset + 0] = frameIcon;
+
+                    instanceBaseColorsDirty = true;
+                    instanceUVOffsetScaleXDirty = true;
 
                     // Reset timers.
                     frameCount = 0;
-                    stopwatch.Reset();
-                    stopwatch.Start();
+                    accumulatedFrameTimeCPU -= frameSampleRate;
+                    accumulatedFrameTimeGPU = 0.0f;
                 }
 
                 // Update scene statistics.
@@ -481,6 +486,12 @@ namespace Microsoft.MixedReality.Profiling
                     instanceColorsDirty = false;
                 }
 
+                if (instanceBaseColorsDirty)
+                {
+                    instancePropertyBlock.SetVectorArray(baseColorID, instanceBaseColors);
+                    instanceBaseColorsDirty = false;
+                }
+
                 if (instanceUVOffsetScaleXDirty)
                 {
                     instancePropertyBlock.SetVectorArray(uvOffsetScaleXID, instanceUVOffsetScaleX);
@@ -510,17 +521,23 @@ namespace Microsoft.MixedReality.Profiling
             BuildFrameRateStrings();
             BuildCharacterUVs();
 
-            // White space is the bottom right of the font texture.
-            Vector4 whiteSpaceUV = new Vector4(0.99f, 1.0f - 0.99f, 0.0f, 0.0f);
+            Vector4 spaceUV = characterUVs[' '];
 
             Vector3 defaultWindowSize = new Vector3(0.2f, 0.04f, 1.0f);
             float edgeX = defaultWindowSize.x * 0.5f;
+
+            // Set the default base color.
+            for (int i = 0; i < instanceBaseColors.Length; ++i)
+            {
+                instanceBaseColors[i] = baseColor;
+            }
 
             // Add a window back plate.
             {
                 instanceMatrices[backplateInstanceOffset] = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, defaultWindowSize);
                 instanceColors[backplateInstanceOffset] = baseColor;
-                instanceUVOffsetScaleX[backplateInstanceOffset] = whiteSpaceUV;
+                instanceBaseColors[backplateInstanceOffset] = baseColor;
+                instanceUVOffsetScaleX[backplateInstanceOffset] = spaceUV;
             }
 
             // Add frame rate text.
@@ -544,8 +561,9 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     instanceMatrices[framesInstanceOffset + i] = Matrix4x4.TRS(position, Quaternion.identity, new Vector3(scale.x * 0.8f, scale.y * 0.8f, scale.z));
                     position.x += scale.x;
-                    instanceColors[framesInstanceOffset + i] = targetFrameRateColor;
-                    instanceUVOffsetScaleX[framesInstanceOffset + i] = whiteSpaceUV;
+                    instanceColors[framesInstanceOffset + i] = Color.white;
+                    instanceBaseColors[framesInstanceOffset + i] = targetFrameRateColor;
+                    instanceUVOffsetScaleX[framesInstanceOffset + i] = spaceUV;
                 }
             }
 
@@ -568,17 +586,20 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     instanceMatrices[limitInstanceOffset] = Matrix4x4.TRS(position, Quaternion.identity, scale);
                     instanceColors[limitInstanceOffset] = memoryLimitColor;
-                    instanceUVOffsetScaleX[limitInstanceOffset] = whiteSpaceUV;
+                    instanceBaseColors[limitInstanceOffset] = memoryLimitColor;
+                    instanceUVOffsetScaleX[limitInstanceOffset] = spaceUV;
                 }
                 {
                     instanceMatrices[peakInstanceOffset] = Matrix4x4.TRS(position, Quaternion.identity, scale);
                     instanceColors[peakInstanceOffset] = memoryPeakColor;
-                    instanceUVOffsetScaleX[peakInstanceOffset] = whiteSpaceUV;
+                    instanceBaseColors[peakInstanceOffset] = memoryPeakColor;
+                    instanceUVOffsetScaleX[peakInstanceOffset] = spaceUV;
                 }
                 {
                     instanceMatrices[usedInstanceOffset] = Matrix4x4.TRS(position, Quaternion.identity, scale);
                     instanceColors[usedInstanceOffset] = memoryUsedColor;
-                    instanceUVOffsetScaleX[usedInstanceOffset] = whiteSpaceUV;
+                    instanceBaseColors[usedInstanceOffset] = memoryUsedColor;
+                    instanceUVOffsetScaleX[usedInstanceOffset] = spaceUV;
                 }
             }
 
@@ -593,13 +614,13 @@ namespace Microsoft.MixedReality.Profiling
                 LayoutText(limitMemoryText);
             }
 
-            // Initialize property block state.
             instanceColorsDirty = true;
+            instanceBaseColorsDirty = true;
             instanceUVOffsetScaleXDirty = true;
 
+            // Initialize property block state.
             if (instancePropertyBlock != null && material != null && material.mainTexture != null)
             {
-                instancePropertyBlock.SetVector(baseColorID, baseColor);
                 instancePropertyBlock.SetVector(fontScaleID, new Vector2((float)fontCharacterSize.x / material.mainTexture.width,
                                                                          (float)fontCharacterSize.y / material.mainTexture.height));
             }
@@ -626,21 +647,27 @@ namespace Microsoft.MixedReality.Profiling
                     ms = milisecondStringBuilder.ToString();
                 }
 
-                stringBuilder.AppendFormat("{0}fps ({1}ms)", frame, ms);
-
                 if (i == (frameRateStrings.Length - 1))
                 {
-                    stringBuilder.Append('+');
+                    stringBuilder.AppendFormat(">{0}fps ({1}ms)", frame, ms);
+                }
+                else
+                {
+                    stringBuilder.AppendFormat("{0}fps ({1}ms)", frame, ms);
                 }
 
                 frameRateStrings[i] = ToCharArray(stringBuilder);
 
                 stringBuilder.Length = 0;
-                stringBuilder.AppendFormat("GPU: {1}ms", frame, ms);
+                
 
                 if (i == (frameRateStrings.Length - 1))
                 {
-                    stringBuilder.Append('-');
+                    stringBuilder.AppendFormat("GPU: <{1}ms", frame, ms);
+                }
+                else
+                {
+                    stringBuilder.AppendFormat("GPU: {1}ms", frame, ms);
                 }
 
                 gpuFrameRateStrings[i] = ToCharArray(stringBuilder);
@@ -925,24 +952,6 @@ namespace Microsoft.MixedReality.Profiling
 #endif
                 return ((int)refreshRate == 0) ? 60.0f : refreshRate;
             }
-        }
-
-        private static void AverageFrameTiming(FrameTiming[] frameTimings, uint frameTimingsCount, out float cpuFrameTime, out float gpuFrameTime)
-        {
-            double cpuTime = 0.0f;
-            double gpuTime = 0.0f;
-
-            for (int i = 0; i < frameTimingsCount; ++i)
-            {
-                cpuTime += frameTimings[i].cpuFrameTime;
-                gpuTime += frameTimings[i].gpuFrameTime;
-            }
-
-            cpuTime /= frameTimingsCount;
-            gpuTime /= frameTimingsCount;
-
-            cpuFrameTime = (float)(cpuTime * 0.001);
-            gpuFrameTime = (float)(gpuTime * 0.001);
         }
 
         private static ulong AppMemoryUsage

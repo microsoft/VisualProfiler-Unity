@@ -5,8 +5,6 @@ Shader "Hidden/Visual Profiler"
 {
     Properties
     {
-        [MainColor] _Color("Color", Color) = (1.0, 1.0, 1.0, 1.0)
-        _BaseColor("Base Color", Color) = (0.0, 0.0, 0.0, 1.0)
         [MainTexture] _FontTexture("Font", 2D) = "black" {}
     }
 
@@ -49,14 +47,14 @@ Shader "Hidden/Visual Profiler"
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
-            fixed4 _BaseColor;
             sampler2D _FontTexture;
             float2 _FontScale;
             float4x4 _WindowLocalToWorldMatrix;
 
             UNITY_INSTANCING_BUFFER_START(Props)
-            UNITY_DEFINE_INSTANCED_PROP(fixed4, _Color)
-            UNITY_DEFINE_INSTANCED_PROP(float4, _UVOffsetScaleX)
+                UNITY_DEFINE_INSTANCED_PROP(fixed4, _Color)
+                UNITY_DEFINE_INSTANCED_PROP(fixed4, _BaseColor)
+                UNITY_DEFINE_INSTANCED_PROP(float4, _UVOffsetScaleX)
             UNITY_INSTANCING_BUFFER_END(Props)
 
             v2f vert(appdata_t v)
@@ -78,10 +76,10 @@ Shader "Hidden/Visual Profiler"
                 // MaterialPropertyBlocks do not have a SetColorArray method, so we need to do color space conversions ourselves.
 #if defined(UNITY_COLORSPACE_GAMMA)
                 o.color = UNITY_ACCESS_INSTANCED_PROP(Props, _Color).rgb;
-                o.baseColor = _BaseColor.rgb;
+                o.baseColor = UNITY_ACCESS_INSTANCED_PROP(Props, _BaseColor).rgb;
 #else
                 o.color = GammaToLinearSpace(UNITY_ACCESS_INSTANCED_PROP(Props, _Color).rgb);
-                o.baseColor = GammaToLinearSpace(_BaseColor.rgb);
+                o.baseColor = GammaToLinearSpace(UNITY_ACCESS_INSTANCED_PROP(Props, _BaseColor).rgb);
 #endif
 
                 // Scale and offset UVs.

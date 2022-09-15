@@ -7,7 +7,7 @@ The Visual Profiler provides a drop in solution for viewing your mixed reality U
 Missed frames are displayed over time to visually find problem areas. Scene complexity is reported in the form of draw calls and rendered vertex counts. Memory is reported as current, peak and max usage in a bar graph.
 
 > [!NOTE]
-> To ensure the profiler is minimally intrusive it does not create any game objects, perform any per frame managed allocations, and renders in a single draw call.
+> To ensure the profiler is minimally intrusive it does not create any GameObjects, perform any per frame managed allocations, and renders in a single draw call.
 
 The Visual Profiler has been verified to work on the following platforms:
 
@@ -23,7 +23,7 @@ The Visual Profiler has been verified to work on the following platforms:
 The Visual Profiler is normally ingested as a Unity [package](https://docs.unity3d.com/Manual/Packages.html). To import the Visual Profiler package into your Unity project follow the below steps:
 
 > [!NOTE]
-> The Visual Profiler package requires Unity 2020.x and above.
+> The Visual Profiler package requires Unity 2020.3 and above.
 
 1. Open your Unity project and select `Window > Package Manager` from the file menu bar
 
@@ -31,7 +31,7 @@ The Visual Profiler is normally ingested as a Unity [package](https://docs.unity
 
     ![Package Manager Add](Documentation~/Images/PackageManagerAdd.png)
 
-3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git#v2.0.0* into the text field and click `"Add"`
+3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git#v2.1.0* into the text field and click `"Add"`
 
     ![Package Manager Paste](Documentation~/Images/PackageManagerPaste.png)
 
@@ -39,7 +39,7 @@ The Visual Profiler is normally ingested as a Unity [package](https://docs.unity
 
 5. Finally, add the VisualProfiler component to any GameObject in the Unity scene you wish to profile. The profiler is initially active and visible (toggle-able via the IsVisible property), but can be toggled via the enabled/disable voice command keywords (on Windows/UWP platforms only).
 
-It is advised you use a specific release of the Visual Profiler package to ensure your project is locked to a stable release. Release version 2.0.0 is suggested in step three above. You can also pull another version, specific branch, or git commit hash by altering the URL as demonstrated below:
+It is advised you use a specific release of the Visual Profiler package to ensure your project is locked to a stable release. Release version 2.1.0 is suggested in step three above. You can also pull another version, specific branch, or git commit hash by altering the URL as demonstrated below:
 
 | Syntax           | URL example                                                                                                                                               |
 |------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
