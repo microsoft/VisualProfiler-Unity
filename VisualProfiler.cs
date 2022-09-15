@@ -374,14 +374,14 @@ namespace Microsoft.MixedReality.Profiling
                     // Update frame rate text.
                     if (lastCpuFrameRate != cpuFrameRate)
                     {
-                        char[] text = frameRateStrings[Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate)];
+                        char[] text = frameRateStrings[lastCpuFrameRate];
                         SetText(cpuFrameRateText, text, text.Length, frameColor);
                         cpuFrameRate = lastCpuFrameRate;
                     }
 
                     if (lastGpuFrameRate != gpuFrameRate)
                     {
-                        char[] text = gpuFrameRateStrings[Mathf.Clamp(lastGpuFrameRate, 0, maxTargetFrameRate)];
+                        char[] text = gpuFrameRateStrings[lastGpuFrameRate];
                         Color color = (lastGpuFrameRate < ((int)(AppFrameRate) - 1)) ? missedFrameRateColor : targetFrameRateColor;
                         SetText(gpuFrameRateText, text, text.Length, color);
                         gpuFrameRate = lastGpuFrameRate;
