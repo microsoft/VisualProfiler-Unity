@@ -46,12 +46,16 @@ namespace Microsoft.MixedReality.Profiling
         }
 
         [SerializeField, Tooltip("The amount of time, in seconds, to collect frames for frame rate calculation.")]
-        private float frameSampleRate = 0.1f;
+        private float frameSampleRate = 0.3f;
 
         public float FrameSampleRate
         {
             get { return frameSampleRate; }
-            set { frameSampleRate = value; }
+            set 
+            { 
+                frameSampleRate = value;
+                frameSampleRateMS = frameSampleRate * 1000.0f;
+            }
         }
 
         [Header("Window Settings")]
@@ -228,6 +232,7 @@ namespace Microsoft.MixedReality.Profiling
         private int frameCount = 0;
         private float accumulatedFrameTimeCPU = 0.0f;
         private float accumulatedFrameTimeGPU = 0.0f;
+        private float frameSampleRateMS = 0.0f;
         private FrameTiming[] frameTimings = new FrameTiming[1];
         private ProfilerRecorder drawCallsRecorder;
         private ProfilerRecorder verticesRecorder;
@@ -348,21 +353,21 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (frameTimingsCount != 0)
                 {
-                    accumulatedFrameTimeCPU += (float)(frameTimings[0].cpuFrameTime * 0.001f);
-                    accumulatedFrameTimeGPU += (float)(frameTimings[0].gpuFrameTime * 0.001f);
+                    accumulatedFrameTimeCPU += (float)frameTimings[0].cpuFrameTime;
+                    accumulatedFrameTimeGPU += (float)frameTimings[0].gpuFrameTime;
                 }
                 else
                 {
-                    accumulatedFrameTimeCPU += Time.unscaledDeltaTime;
+                    accumulatedFrameTimeCPU += Time.unscaledDeltaTime * 1000.0f;
                     // No GPU time to query.
                 }
 
                 ++frameCount;
 
-                if (accumulatedFrameTimeCPU >= frameSampleRate)
+                if (accumulatedFrameTimeCPU >= frameSampleRateMS)
                 {
-                    int lastCpuFrameRate = (int)(1.0f / (accumulatedFrameTimeCPU / frameCount));
-                    int lastGpuFrameRate = (int)(1.0f / (accumulatedFrameTimeGPU / frameCount));
+                    int lastCpuFrameRate = Mathf.RoundToInt(1.0f / ((accumulatedFrameTimeCPU * 0.001f) / frameCount));
+                    int lastGpuFrameRate = Mathf.RoundToInt(1.0f / ((accumulatedFrameTimeGPU * 0.001f) / frameCount));
                     lastCpuFrameRate = Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate);
                     lastGpuFrameRate = Mathf.Clamp(lastGpuFrameRate, 0, maxTargetFrameRate);
 
@@ -374,14 +379,14 @@ namespace Microsoft.MixedReality.Profiling
                     // Update frame rate text.
                     if (lastCpuFrameRate != cpuFrameRate)
                     {
-                        char[] text = frameRateStrings[Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate)];
+                        char[] text = frameRateStrings[lastCpuFrameRate];
                         SetText(cpuFrameRateText, text, text.Length, frameColor);
                         cpuFrameRate = lastCpuFrameRate;
                     }
 
                     if (lastGpuFrameRate != gpuFrameRate)
                     {
-                        char[] text = gpuFrameRateStrings[Mathf.Clamp(lastGpuFrameRate, 0, maxTargetFrameRate)];
+                        char[] text = gpuFrameRateStrings[lastGpuFrameRate];
                         Color color = (lastGpuFrameRate < ((int)(AppFrameRate) - 1)) ? missedFrameRateColor : targetFrameRateColor;
                         SetText(gpuFrameRateText, text, text.Length, color);
                         gpuFrameRate = lastGpuFrameRate;
@@ -404,7 +409,7 @@ namespace Microsoft.MixedReality.Profiling
 
                     // Reset timers.
                     frameCount = 0;
-                    accumulatedFrameTimeCPU -= frameSampleRate;
+                    accumulatedFrameTimeCPU = 0.0f;
                     accumulatedFrameTimeGPU = 0.0f;
                 }
 
@@ -630,6 +635,8 @@ namespace Microsoft.MixedReality.Profiling
 
         private void BuildFrameRateStrings()
         {
+            frameSampleRateMS = frameSampleRate * 1000.0f;
+
             string displayedDecimalFormat = string.Format("{{0:F{0}}}", displayedDecimalDigits);
 
             StringBuilder stringBuilder = new StringBuilder(32);
