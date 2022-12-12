@@ -177,7 +177,8 @@ namespace Microsoft.MixedReality.Profiling
         private const int cpuframeRateTextOffset = usedInstanceOffset + 1;
         private const int gpuframeRateTextOffset = cpuframeRateTextOffset + maxStringLength;
 
-        private const int drawCallTextOffset = gpuframeRateTextOffset + maxStringLength;
+        private const int batchesTextOffset = gpuframeRateTextOffset + maxStringLength;
+        private const int drawCallTextOffset = batchesTextOffset + maxStringLength;
         private const int verticesTextOffset = drawCallTextOffset + maxStringLength;
 
         private const int usedMemoryTextOffset = verticesTextOffset + maxStringLength;
@@ -205,6 +206,7 @@ namespace Microsoft.MixedReality.Profiling
         private TextData cpuFrameRateText = null;
         private TextData gpuFrameRateText = null;
 
+        private TextData batchesText = null;
         private TextData drawCallText = null;
         private TextData verticesText = null;
 
@@ -221,6 +223,7 @@ namespace Microsoft.MixedReality.Profiling
 
         private int cpuFrameRate = -1;
         private int gpuFrameRate = -1;
+        private long batches = 0;
         private long drawCalls = 0;
         private long vertexCount = 0;
         private ulong memoryUsage = 0;
@@ -234,6 +237,7 @@ namespace Microsoft.MixedReality.Profiling
         private float accumulatedFrameTimeGPU = 0.0f;
         private float frameSampleRateMS = 0.0f;
         private FrameTiming[] frameTimings = new FrameTiming[1];
+        private ProfilerRecorder batchesRecorder;
         private ProfilerRecorder drawCallsRecorder;
         private ProfilerRecorder verticesRecorder;
 
@@ -256,6 +260,7 @@ namespace Microsoft.MixedReality.Profiling
         {
             cpuFrameRate = -1;
             gpuFrameRate = -1;
+            batches = 0;
             drawCalls = 0;
             vertexCount = 0;
             memoryUsage = 0;
@@ -290,6 +295,7 @@ namespace Microsoft.MixedReality.Profiling
             windowVerticalRotation = Quaternion.AngleAxis(defaultWindowRotation.x, Vector3.up);
             windowVerticalRotationInverse = Quaternion.Inverse(windowVerticalRotation);
 
+            batchesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Batches Count");
             drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
             verticesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Vertices Count");
 
@@ -312,6 +318,7 @@ namespace Microsoft.MixedReality.Profiling
 #endif
             verticesRecorder.Dispose();
             drawCallsRecorder.Dispose();
+            batchesRecorder.Dispose();
         }
 
         private void OnValidate()
@@ -414,11 +421,20 @@ namespace Microsoft.MixedReality.Profiling
                 }
 
                 // Update scene statistics.
+                long lastBatches = batchesRecorder.LastValue;
+
+                if (lastBatches != batches)
+                {
+                    SceneStatsToString(stringBuffer, batchesText, lastBatches);
+
+                    batches = lastBatches;
+                }
+
                 long lastDrawCalls = drawCallsRecorder.LastValue;
 
                 if (lastDrawCalls != drawCalls)
                 {
-                    DrawCallsToString(stringBuffer, drawCallText, lastDrawCalls);
+                    SceneStatsToString(stringBuffer, drawCallText, lastDrawCalls);
 
                     drawCalls = lastDrawCalls;
                 }
@@ -575,7 +591,9 @@ namespace Microsoft.MixedReality.Profiling
             // Add scene statistics text.
             {
                 float height = 0.0045f;
-                drawCallText = new TextData(new Vector3(-edgeX, height, 0.0f), false, drawCallTextOffset, "Draw Calls: ");
+                batchesText = new TextData(new Vector3(-edgeX, height, 0.0f), false, batchesTextOffset, "Batches: ");
+                LayoutText(batchesText);
+                drawCallText = new TextData(new Vector3(-0.03f, height, 0.0f), false, drawCallTextOffset, "Draw Calls: ");
                 LayoutText(drawCallText);
                 verticesText = new TextData(new Vector3(edgeX, height, 0.0f), true, verticesTextOffset, "Verts: ");
                 LayoutText(verticesText);
@@ -831,7 +849,7 @@ namespace Microsoft.MixedReality.Profiling
             SetText(data, buffer, bufferIndex, color);
         }
 
-        private void DrawCallsToString(char[] buffer, TextData data, long drawCalls)
+        private void SceneStatsToString(char[] buffer, TextData data, long drawCalls)
         {
             int bufferIndex = 0;
 
