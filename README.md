@@ -4,7 +4,7 @@ The Visual Profiler provides a drop in solution for viewing your mixed reality U
 
 ![Visual Profiler Screenshot](Documentation~/Images/ProfilerScreenshot.png)
 
-Missed frames are displayed over time to visually find problem areas. Scene complexity is reported in the form of draw calls and rendered vertex counts. Memory is reported as current, peak and max usage in a bar graph.
+Missed frames are displayed over time to visually find problem areas. Scene complexity is reported in the form of draw calls and rendered vertex counts (or triangle counts). Memory is reported as current, peak and max usage in a bar graph.
 
 > [!NOTE]
 > To ensure the profiler is minimally intrusive it does not create any GameObjects, perform any per frame managed allocations, and renders in a single draw call.
@@ -49,7 +49,7 @@ It is advised you use a specific release of the Visual Profiler package to ensur
 
 ## Usage
 
-When using the profiler look for "missed frames" which appear as orange bars. Missed frames indicate your application is not hitting its target frame rate and may need optimization work. Draw call counts and vertex counts are also displayed under the missed frame indicators. These numbers can be indicative of why your app isn't meeting its target frame rate.
+When using the profiler look for "missed frames" which appear as orange bars. Missed frames indicate your application is not hitting its target frame rate and may need optimization work. Draw call counts and vertex counts (or triangle counts) are also displayed under the missed frame indicators. These numbers can be indicative of why your app isn't meeting its target frame rate.
 
 ![Profiler Guide](Documentation~/Images/ProfilerGuide.png)
 

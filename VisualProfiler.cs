@@ -2,9 +2,9 @@
 // Licensed under the MIT License.
 
 using System.Text;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Profiling;
-using Unity.Profiling;
 
 #if UNITY_STANDALONE_WIN || UNITY_WSA
 using UnityEngine.Windows.Speech;
@@ -20,8 +20,8 @@ namespace Microsoft.MixedReality.Profiling
     /// 
     /// ABOUT: The VisualProfiler provides a drop in solution for viewing your Mixed Reality 
     /// Unity application's frame rate and memory usage. Missed frames are displayed over time to 
-    /// visually find problem areas. Draw calls and vertex counts are displayed to diagnose scene 
-    /// complexity. Memory is reported as current, peak and max usage in a bar graph.
+    /// visually find problem areas. Draw calls, batches, and vertex (or triangle) counts are displayed to 
+    /// diagnose scene complexity. Memory is reported as current, peak and max usage in a bar graph.
     /// 
     /// USAGE: To use this profiler simply add this script as a component of any GameObject in 
     /// your Unity scene. The profiler is initially active and visible (toggle-able via the 
@@ -114,6 +114,9 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Range(0, 2), Tooltip("How many decimal places to display on numeric strings.")]
         private int displayedDecimalDigits = 1;
 
+        [SerializeField, Tooltip("Display triangle count instead of vertex count in the profiler.")]
+        private bool displayTriangleCount = false;
+
         [SerializeField, Tooltip("The color of the window backplate.")]
         private Color baseColor = new Color(50 / 255.0f, 50 / 255.0f, 50 / 255.0f, 1.0f);
 
@@ -179,9 +182,9 @@ namespace Microsoft.MixedReality.Profiling
 
         private const int batchesTextOffset = gpuframeRateTextOffset + maxStringLength;
         private const int drawCallTextOffset = batchesTextOffset + maxStringLength;
-        private const int verticesTextOffset = drawCallTextOffset + maxStringLength;
+        private const int meshStatsTextOffset = drawCallTextOffset + maxStringLength;
 
-        private const int usedMemoryTextOffset = verticesTextOffset + maxStringLength;
+        private const int usedMemoryTextOffset = meshStatsTextOffset + maxStringLength;
         private const int limitMemoryTextOffset = usedMemoryTextOffset + maxStringLength;
         private const int peakMemoryTextOffset = limitMemoryTextOffset + maxStringLength;
 
@@ -208,7 +211,7 @@ namespace Microsoft.MixedReality.Profiling
 
         private TextData batchesText = null;
         private TextData drawCallText = null;
-        private TextData verticesText = null;
+        private TextData meshText = null;
 
         private TextData usedMemoryText = null;
         private TextData peakMemoryText = null;
@@ -225,7 +228,7 @@ namespace Microsoft.MixedReality.Profiling
         private int gpuFrameRate = -1;
         private long batches = 0;
         private long drawCalls = 0;
-        private long vertexCount = 0;
+        private long meshStatsCount = 0;
         private ulong memoryUsage = 0;
         private ulong peakMemoryUsage = 0;
         private ulong limitMemoryUsage = 0;
@@ -239,7 +242,7 @@ namespace Microsoft.MixedReality.Profiling
         private FrameTiming[] frameTimings = new FrameTiming[1];
         private ProfilerRecorder batchesRecorder;
         private ProfilerRecorder drawCallsRecorder;
-        private ProfilerRecorder verticesRecorder;
+        private ProfilerRecorder meshStatsRecorder;
 
         // Rendering state.
         private Mesh quadMesh;
@@ -262,7 +265,7 @@ namespace Microsoft.MixedReality.Profiling
             gpuFrameRate = -1;
             batches = 0;
             drawCalls = 0;
-            vertexCount = 0;
+            meshStatsCount = 0;
             memoryUsage = 0;
             peakMemoryUsage = 0;
             limitMemoryUsage = 0;
@@ -297,7 +300,7 @@ namespace Microsoft.MixedReality.Profiling
 
             batchesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Batches Count");
             drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
-            verticesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Vertices Count");
+            meshStatsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, displayTriangleCount ? "Triangles Count" : "Vertices Count");
 
             BuildWindow();
 
@@ -316,7 +319,7 @@ namespace Microsoft.MixedReality.Profiling
                 keywordRecognizer = null;
             }
 #endif
-            verticesRecorder.Dispose();
+            meshStatsRecorder.Dispose();
             drawCallsRecorder.Dispose();
             batchesRecorder.Dispose();
         }
@@ -439,16 +442,16 @@ namespace Microsoft.MixedReality.Profiling
                     drawCalls = lastDrawCalls;
                 }
 
-                long lastVertexCount = verticesRecorder.LastValue;
+                long lastMeshStatsCount = meshStatsRecorder.LastValue;
 
-                if (lastVertexCount != vertexCount)
+                if (lastMeshStatsCount != meshStatsCount)
                 {
-                    if (WillDisplayedVertexCountDiffer(lastVertexCount, vertexCount, displayedDecimalDigits))
+                    if (WillDisplayedMeshStatsCountDiffer(lastMeshStatsCount, meshStatsCount, displayedDecimalDigits))
                     {
-                        VertexCountToString(stringBuffer, displayedDecimalDigits, verticesText, lastVertexCount);
+                        MeshStatsToString(stringBuffer, displayedDecimalDigits, meshText, lastMeshStatsCount);
                     }
 
-                    vertexCount = lastVertexCount;
+                    meshStatsCount = lastMeshStatsCount;
                 }
 
                 // Update memory statistics.
@@ -595,8 +598,8 @@ namespace Microsoft.MixedReality.Profiling
                 LayoutText(batchesText);
                 drawCallText = new TextData(new Vector3(-0.03f, height, 0.0f), false, drawCallTextOffset, "Draw Calls: ");
                 LayoutText(drawCallText);
-                verticesText = new TextData(new Vector3(edgeX, height, 0.0f), true, verticesTextOffset, "Verts: ");
-                LayoutText(verticesText);
+                meshText = new TextData(new Vector3(edgeX, height, 0.0f), true, meshStatsTextOffset, displayTriangleCount ? "Tris: " : "Verts: ");
+                LayoutText(meshText);
             }
 
             // Add memory usage bars.
@@ -872,7 +875,7 @@ namespace Microsoft.MixedReality.Profiling
             SetText(data, buffer, bufferIndex, Color.white);
         }
 
-        private void VertexCountToString(char[] buffer, int displayedDecimalDigits, TextData data, long vertexCount)
+        private void MeshStatsToString(char[] buffer, int displayedDecimalDigits, TextData data, long count)
         {
             int bufferIndex = 0;
 
@@ -882,15 +885,15 @@ namespace Microsoft.MixedReality.Profiling
             }
 
             bool usingMillions = false;
-            float count = vertexCount / 1000.0f;
+            float total = count / 1000.0f;
 
-            if (count > 1000.0f)
+            if (total > 1000.0f)
             {
-                count /= 1000.0f;
+                total /= 1000.0f;
                 usingMillions = true;
             }
 
-            bufferIndex = FtoA(count, displayedDecimalDigits, buffer, bufferIndex);
+            bufferIndex = FtoA(total, displayedDecimalDigits, buffer, bufferIndex);
 
             buffer[bufferIndex++] = usingMillions ? 'm' : 'k';
 
@@ -1003,7 +1006,7 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        private static bool WillDisplayedVertexCountDiffer(long oldCount, long newCount, int displayedDecimalDigits)
+        private static bool WillDisplayedMeshStatsCountDiffer(long oldCount, long newCount, int displayedDecimalDigits)
         {
             float decimalPower = Mathf.Pow(10.0f, displayedDecimalDigits) / 1000.0f;
 
