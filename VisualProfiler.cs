@@ -33,21 +33,27 @@ namespace Microsoft.MixedReality.Profiling
     /// Visual Studio Package.appxmanifest capabilities.
     /// 
     /// </summary>
-    public class VisualProfiler : MonoBehaviour
+    public sealed class VisualProfiler : MonoBehaviour
     {
         [Header("Profiler Settings")]
         [SerializeField, Tooltip("Is the profiler currently visible? If disabled, prevents the profiler from rendering but still allows it to track memory usage.")]
         private bool isVisible = true;
 
+        /// <summary>
+        /// Is the profiler currently visible? If disabled, prevents the profiler from rendering but still allows it to track memory usage.
+        /// </summary>
         public bool IsVisible
         {
             get { return isVisible; }
             set { isVisible = value; }
         }
 
-        [SerializeField, Tooltip("The amount of time, in seconds, to collect frames for frame rate calculation.")]
+        [SerializeField, Tooltip("The amount of time, in seconds, to collect frames before frame rate averaging.")]
         private float frameSampleRate = 0.3f;
 
+        /// <summary>
+        /// The amount of time, in seconds, to collect frames before frame rate averaging.
+        /// </summary>
         public float FrameSampleRate
         {
             get { return frameSampleRate; }
@@ -58,10 +64,25 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
+        [SerializeField, Tooltip("What frame rate should the app target if one cannot be determined by the XR device.")]
+        private float defaultFrameRate = 60.0f;
+
+        /// <summary>
+        /// What frame rate should the app target if one cannot be determined by the XR device.
+        /// </summary>
+        public float DefaultFrameRate
+        {
+            get { return defaultFrameRate; }
+            set { defaultFrameRate = value; }
+        }
+
         [Header("Window Settings")]
         [SerializeField, Tooltip("What part of the view port to anchor the window to.")]
         private TextAnchor windowAnchor = TextAnchor.LowerCenter;
 
+        /// <summary>
+        /// What part of the view port to anchor the window to.
+        /// </summary>
         public TextAnchor WindowAnchor
         {
             get { return windowAnchor; }
@@ -71,6 +92,9 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Tooltip("The offset from the view port center applied based on the window anchor selection.")]
         private Vector2 windowOffset = new Vector2(0.1f, 0.1f);
 
+        /// <summary>
+        /// The offset from the view port center applied based on the window anchor selection.
+        /// </summary>
         public Vector2 WindowOffset
         {
             get { return windowOffset; }
@@ -80,6 +104,9 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Range(0.5f, 5.0f), Tooltip("Use to scale the window size up or down, can simulate a zooming effect.")]
         private float windowScale = 1.0f;
 
+        /// <summary>
+        /// Use to scale the window size up or down, can simulate a zooming effect.
+        /// </summary>
         public float WindowScale
         {
             get { return windowScale; }
@@ -89,6 +116,9 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Range(0.0f, 100.0f), Tooltip("How quickly to interpolate the window towards its target position and rotation.")]
         private float windowFollowSpeed = 5.0f;
 
+        /// <summary>
+        /// How quickly to interpolate the window towards its target position and rotation.
+        /// </summary>
         public float WindowFollowSpeed
         {
             get { return windowFollowSpeed; }
@@ -98,10 +128,39 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Tooltip("Should the window snap to location rather than interpolate?")]
         private bool snapWindow = false;
 
+        /// <summary>
+        /// Should the window snap to location rather than interpolate?
+        /// </summary>
         public bool SnapWindow
         {
             get { return snapWindow; }
             set { snapWindow = value; }
+        }
+
+        /// <summary>
+        /// Access the CPU frame rate (in frames per second).
+        /// </summary>
+        public float SmoothCpuFrameRate { get; private set; }
+
+        /// <summary>
+        /// Access the GPU frame rate (in frames per second). Will return zero when GPU profiling is not available.
+        /// </summary>
+        public float SmoothGpuFrameRate { get; private set; }
+
+        /// <summary>
+        /// Returns the target frame rate for the current platform.
+        /// </summary>
+        public float TargetFrameRate
+        {
+            get
+            {
+                // If the current XR SDK does not report refresh rate information, assume 60Hz.
+                float refreshRate = 0;
+#if ENABLE_VR
+                refreshRate = UnityEngine.XR.XRDevice.refreshRate;
+#endif
+                return ((int)refreshRate == 0) ? defaultFrameRate : refreshRate;
+            }
         }
 
         [SerializeField, Tooltip("Voice commands to toggle the profiler on and off. (Supported in UWP only.)")]
@@ -145,24 +204,6 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Min(1), Tooltip("How many characters are in a row of the font texture.")]
         private int fontColumns = 32;
 
-        private class TextData
-        {
-            public string Prefix;
-            public Vector3 Position;
-            public bool RightAligned;
-            public int Offset;
-            public int LastProcessed;
-
-            public TextData(Vector3 position, bool rightAligned, int offset, string prefix = "")
-            {
-                Position = position;
-                RightAligned = rightAligned;
-                Offset = offset;
-                Prefix = prefix;
-                LastProcessed = maxStringLength;
-            }
-        }
-
         // Constants.
         private const int maxStringLength = 17;
         private const int maxTargetFrameRate = 240;
@@ -205,6 +246,24 @@ namespace Microsoft.MixedReality.Profiling
         // UI state.
         private Vector3 windowPosition = Vector3.zero;
         private Quaternion windowRotation = Quaternion.identity;
+
+        private class TextData
+        {
+            public string Prefix;
+            public Vector3 Position;
+            public bool RightAligned;
+            public int Offset;
+            public int LastProcessed;
+
+            public TextData(Vector3 position, bool rightAligned, int offset, string prefix = "")
+            {
+                Position = position;
+                RightAligned = rightAligned;
+                Offset = offset;
+                Prefix = prefix;
+                LastProcessed = maxStringLength;
+            }
+        }
 
         private TextData cpuFrameRateText = null;
         private TextData gpuFrameRateText = null;
@@ -261,6 +320,8 @@ namespace Microsoft.MixedReality.Profiling
         /// </summary>
         public void Refresh()
         {
+            SmoothCpuFrameRate = 0.0f;
+            SmoothGpuFrameRate = 0.0f;
             cpuFrameRate = -1;
             gpuFrameRate = -1;
             batches = 0;
@@ -376,13 +437,22 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (accumulatedFrameTimeCPU >= frameSampleRateMS)
                 {
-                    int lastCpuFrameRate = Mathf.RoundToInt(1.0f / ((accumulatedFrameTimeCPU * 0.001f) / frameCount));
-                    int lastGpuFrameRate = Mathf.RoundToInt(1.0f / ((accumulatedFrameTimeGPU * 0.001f) / frameCount));
-                    lastCpuFrameRate = Mathf.Clamp(lastCpuFrameRate, 0, maxTargetFrameRate);
-                    lastGpuFrameRate = Mathf.Clamp(lastGpuFrameRate, 0, maxTargetFrameRate);
+                    if (accumulatedFrameTimeCPU != 0.0f)
+                    {
+                        SmoothCpuFrameRate = Mathf.Max(1.0f / ((accumulatedFrameTimeCPU * 0.001f) / frameCount), 0.0f);
+                    }
+
+                    int lastCpuFrameRate = Mathf.Min(Mathf.RoundToInt(SmoothCpuFrameRate), maxTargetFrameRate);
+
+                    if (accumulatedFrameTimeGPU != 0.0f)
+                    {
+                        SmoothGpuFrameRate = Mathf.Max(1.0f / ((accumulatedFrameTimeGPU * 0.001f) / frameCount), 0.0f);
+                    }
+
+                    int lastGpuFrameRate = Mathf.Min(Mathf.RoundToInt(SmoothGpuFrameRate), maxTargetFrameRate);
 
                     // TODO - [Cameron-Micka] Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
-                    bool missedFrame = lastCpuFrameRate < ((int)(AppFrameRate) - 1);
+                    bool missedFrame = lastCpuFrameRate < ((int)(TargetFrameRate) - 1);
                     Color frameColor = missedFrame ? missedFrameRateColor : targetFrameRateColor;
                     Vector4 frameIcon = missedFrame ? characterUVs['X'] : characterUVs[' '];
 
@@ -397,7 +467,7 @@ namespace Microsoft.MixedReality.Profiling
                     if (lastGpuFrameRate != gpuFrameRate)
                     {
                         char[] text = gpuFrameRateStrings[lastGpuFrameRate];
-                        Color color = (lastGpuFrameRate < ((int)(AppFrameRate) - 1)) ? missedFrameRateColor : targetFrameRateColor;
+                        Color color = (lastGpuFrameRate < ((int)(TargetFrameRate) - 1)) ? missedFrameRateColor : targetFrameRateColor;
                         SetText(gpuFrameRateText, text, text.Length, color);
                         gpuFrameRate = lastGpuFrameRate;
                     }
@@ -967,19 +1037,6 @@ namespace Microsoft.MixedReality.Profiling
             }
 
             return bufferIndex;
-        }
-
-        private static float AppFrameRate
-        {
-            get
-            {
-                // If the current XR SDK does not report refresh rate information, assume 60Hz.
-                float refreshRate = 0;
-#if ENABLE_VR
-                refreshRate = UnityEngine.XR.XRDevice.refreshRate;
-#endif
-                return ((int)refreshRate == 0) ? 60.0f : refreshRate;
-            }
         }
 
         private static ulong AppMemoryUsage
