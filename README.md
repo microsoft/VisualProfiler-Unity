@@ -31,7 +31,7 @@ The Visual Profiler is normally ingested as a Unity [package](https://docs.unity
 
     ![Package Manager Add](Documentation~/Images/PackageManagerAdd.png)
 
-3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git#v2.2.0* into the text field and click `"Add"`
+3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git#v2.5.0* into the text field and click `"Add"`
 
     ![Package Manager Paste](Documentation~/Images/PackageManagerPaste.png)
 
