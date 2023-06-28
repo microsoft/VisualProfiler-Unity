@@ -1,10 +1,13 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using System.Text;
 using Unity.Profiling;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
+using static UnityEngine.ParticleSystem;
 
 #if UNITY_STANDALONE_WIN || UNITY_WSA
 using UnityEngine.Windows.Speech;
@@ -204,6 +207,80 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Min(1), Tooltip("How many characters are in a row of the font texture.")]
         private int fontColumns = 32;
 
+        [System.Serializable]
+        private class CustomProfiler
+        {
+            public enum CategoryType
+            {
+                None = 0,
+                VirtualTexturing,
+                Memory,
+                Input,
+                Vr,
+                Loading,
+                Network,
+                Lighting,
+                Particles,
+                Video,
+                Audio,
+                Ai,
+                Animation,
+                Physics,
+                Gui,
+                Scripts,
+                Render,
+                FileIO,
+                Internal,
+            }
+
+            [Tooltip("TODO")]
+            public string DisplayName;
+
+            [Tooltip("TODO")]
+            public CategoryType Category = CategoryType.None;
+            
+            [Tooltip("TODO")]
+            public string StatName;
+            
+            [Min(1), Tooltip("TODO")]
+            public int Capacity = 1;
+
+            public ProfilerRecorder Recorder { get; set; }
+            
+            public TextData Text { get; set; }
+
+            public static ProfilerCategory ToProfilerCategory(CategoryType category)
+            {
+                switch (category)
+                {
+                    default:
+                    case CategoryType.None:             return new ProfilerCategory();
+                    case CategoryType.VirtualTexturing: return ProfilerCategory.VirtualTexturing;
+                    case CategoryType.Memory:           return ProfilerCategory.Memory;
+                    case CategoryType.Input:            return ProfilerCategory.Input;
+                    case CategoryType.Vr:               return ProfilerCategory.Vr;
+                    case CategoryType.Loading:          return ProfilerCategory.Loading;
+                    case CategoryType.Network:          return ProfilerCategory.Network;
+                    case CategoryType.Lighting:         return ProfilerCategory.Lighting;
+                    case CategoryType.Particles:        return ProfilerCategory.Particles;
+                    case CategoryType.Video:            return ProfilerCategory.Video;
+                    case CategoryType.Audio:            return ProfilerCategory.Audio;
+                    case CategoryType.Ai:               return ProfilerCategory.Ai;
+                    case CategoryType.Animation:        return ProfilerCategory.Animation;
+                    case CategoryType.Physics:          return ProfilerCategory.Physics;
+                    case CategoryType.Gui:              return ProfilerCategory.Gui;
+                    case CategoryType.Scripts:          return ProfilerCategory.Scripts;
+                    case CategoryType.Render:           return ProfilerCategory.Render;
+                    case CategoryType.FileIO:           return ProfilerCategory.FileIO;
+                    case CategoryType.Internal:         return ProfilerCategory.Internal;
+                }
+            }
+        }
+
+        [Header("Custom Profilers")]
+        [SerializeField, Tooltip("TODO")]
+        private CustomProfiler[] customProfilers;
+
         // Constants.
         private const int maxStringLength = 17;
         private const int maxTargetFrameRate = 240;
@@ -229,7 +306,7 @@ namespace Microsoft.MixedReality.Profiling
         private const int limitMemoryTextOffset = usedMemoryTextOffset + maxStringLength;
         private const int peakMemoryTextOffset = limitMemoryTextOffset + maxStringLength;
 
-        private const int instanceCount = peakMemoryTextOffset + maxStringLength;
+        private const int lastOffset = peakMemoryTextOffset + maxStringLength;
 
         private static readonly int colorID = Shader.PropertyToID("_Color");
         private static readonly int baseColorID = Shader.PropertyToID("_BaseColor");
@@ -306,10 +383,10 @@ namespace Microsoft.MixedReality.Profiling
         // Rendering state.
         private Mesh quadMesh;
         private MaterialPropertyBlock instancePropertyBlock;
-        private Matrix4x4[] instanceMatrices = new Matrix4x4[instanceCount];
-        private Vector4[] instanceColors = new Vector4[instanceCount];
-        private Vector4[] instanceBaseColors = new Vector4[instanceCount];
-        private Vector4[] instanceUVOffsetScaleX = new Vector4[instanceCount];
+        private Matrix4x4[] instanceMatrices;
+        private Vector4[] instanceColors;
+        private Vector4[] instanceBaseColors;
+        private Vector4[] instanceUVOffsetScaleX;
         private bool instanceColorsDirty = false;
         private bool instanceBaseColorsDirty = false;
         private bool instanceUVOffsetScaleXDirty = false;
@@ -363,6 +440,18 @@ namespace Microsoft.MixedReality.Profiling
             drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
             meshStatsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, displayTriangleCount ? "Triangles Count" : "Vertices Count");
 
+            foreach (var profiler in customProfilers)
+            {
+                if (profiler.Category == CustomProfiler.CategoryType.None)
+                {
+                    profiler.Recorder = ProfilerRecorder.StartNew(new ProfilerMarker(profiler.StatName), profiler.Capacity);
+                }
+                else
+                {
+                    profiler.Recorder = ProfilerRecorder.StartNew(CustomProfiler.ToProfilerCategory(profiler.Category), profiler.StatName, profiler.Capacity);
+                }
+            }
+
             BuildWindow();
 
 #if UNITY_STANDALONE_WIN || UNITY_WSA
@@ -380,6 +469,12 @@ namespace Microsoft.MixedReality.Profiling
                 keywordRecognizer = null;
             }
 #endif
+
+            foreach (var profiler in customProfilers)
+            {
+                profiler.Recorder.Dispose();
+            }
+
             meshStatsRecorder.Dispose();
             drawCallsRecorder.Dispose();
             batchesRecorder.Dispose();
@@ -615,6 +710,12 @@ namespace Microsoft.MixedReality.Profiling
             BuildFrameRateStrings();
             BuildCharacterUVs();
 
+            int instanceCount = lastOffset + (maxStringLength * customProfilers.Length);
+            instanceMatrices = new Matrix4x4[instanceCount];
+            instanceColors = new Vector4[instanceCount];
+            instanceBaseColors = new Vector4[instanceCount];
+            instanceUVOffsetScaleX = new Vector4[instanceCount];
+
             Vector4 spaceUV = characterUVs[' '];
 
             Vector3 defaultWindowSize = new Vector3(0.2f, 0.04f, 1.0f);
@@ -708,6 +809,20 @@ namespace Microsoft.MixedReality.Profiling
                 LayoutText(peakMemoryText);
                 limitMemoryText = new TextData(new Vector3(edgeX, height, 0.0f), true, limitMemoryTextOffset, "Limit: ");
                 LayoutText(limitMemoryText);
+            }
+
+            // Add custom profilers.
+            {
+                int offset = lastOffset;
+                float height = -0.0145f;
+                foreach (var profiler in customProfilers)
+                {
+                    profiler.Text = new TextData(new Vector3(-edgeX, height, 0.0f), false, offset, $"{profiler.DisplayName}: ");
+                    LayoutText(profiler.Text);
+
+                    offset += maxStringLength;
+                    height -= 0.0035f;
+                }
             }
 
             instanceColorsDirty = true;
@@ -897,7 +1012,6 @@ namespace Microsoft.MixedReality.Profiling
 
         private void MemoryUsageToString(char[] buffer, int displayedDecimalDigits, TextData data, ulong memoryUsage, Color color)
         {
-            
             bool usingGigabytes = false;
             float usage = ConvertBytesToMegabytes(memoryUsage);
 
