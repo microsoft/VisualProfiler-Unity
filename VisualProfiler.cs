@@ -210,6 +210,9 @@ namespace Microsoft.MixedReality.Profiling
         [System.Serializable]
         private class CustomProfiler
         {
+            /// <summary>
+            /// TODO
+            /// </summary>
             public enum CategoryType
             {
                 None = 0,
@@ -279,7 +282,7 @@ namespace Microsoft.MixedReality.Profiling
 
         [Header("Custom Profilers")]
         [SerializeField, Tooltip("TODO")]
-        private CustomProfiler[] customProfilers;
+        private CustomProfiler[] customProfilers = new CustomProfiler[0];
 
         // Constants.
         private const int maxStringLength = 17;
@@ -415,6 +418,26 @@ namespace Microsoft.MixedReality.Profiling
             {
                 Debug.LogError("The VisualProfiler is missing a material and will not display.");
             }
+
+            // TEMP
+            customProfilers = new CustomProfiler[]
+            {
+                new CustomProfiler()
+                {
+                    DisplayName = "Phyx",
+                    Category = CustomProfiler.CategoryType.Physics,
+                    StatName = "Physics.Processing",
+                    Capacity = 300,
+                },
+                new CustomProfiler()
+                {
+                    DisplayName = "Script",
+                    Category = CustomProfiler.CategoryType.Scripts,
+                    StatName = "BehaviourUpdate",
+                    Capacity = 300,
+                },
+            };
+            // TEMP
 
             // Create a quad mesh with artificially large bounds to disable culling for instanced rendering.
             // TODO - [Cameron-Micka] Use shared mesh with normal bounds once Unity allows for more control over instance culling.
@@ -665,6 +688,12 @@ namespace Microsoft.MixedReality.Profiling
                     peakMemoryUsageDirty = false;
                 }
 
+                // Update custom profilers
+                foreach (var profiler in customProfilers)
+                {
+                    MillisecondsToString(stringBuffer, displayedDecimalDigits, profiler);
+                }
+
                 // Render.
                 Matrix4x4 windowLocalToWorldMatrix = Matrix4x4.TRS(windowPosition, windowRotation, Vector3.one * windowScale);
                 instancePropertyBlock.SetMatrix(windowLocalToWorldID, windowLocalToWorldMatrix);
@@ -814,14 +843,14 @@ namespace Microsoft.MixedReality.Profiling
             // Add custom profilers.
             {
                 int offset = lastOffset;
-                float height = -0.0145f;
+                float height = -0.02f;
                 foreach (var profiler in customProfilers)
                 {
                     profiler.Text = new TextData(new Vector3(-edgeX, height, 0.0f), false, offset, $"{profiler.DisplayName}: ");
                     LayoutText(profiler.Text);
 
                     offset += maxStringLength;
-                    height -= 0.0035f;
+                    height -= characterScale.y;
                 }
             }
 
@@ -1082,6 +1111,42 @@ namespace Microsoft.MixedReality.Profiling
             buffer[bufferIndex++] = usingMillions ? 'm' : 'k';
 
             SetText(data, buffer, bufferIndex, Color.white);
+        }
+
+        private void MillisecondsToString(char[] buffer, int displayedDecimalDigits, CustomProfiler profiler)
+        {
+            int bufferIndex = 0;
+
+            for (int i = 0; i < profiler.Text.Prefix.Length; ++i)
+            {
+                buffer[bufferIndex++] = profiler.Text.Prefix[i];
+            }
+
+            long sum = 0;
+            int length = 0;
+            int count = profiler.Recorder.Count;
+
+            for (int i = 0; i < count; ++i)
+            {
+                var value = profiler.Recorder.GetSample(i).Value;
+
+                if (value == 0)
+                {
+                    continue;
+                }
+
+                sum += value;
+                ++length;
+            }
+
+            float average = (length > 0) ? (float)sum / length : 0.0f;
+
+            bufferIndex = FtoA(average * 1e-6f, displayedDecimalDigits, buffer, bufferIndex);
+
+            buffer[bufferIndex++] = 'm';
+            buffer[bufferIndex++] = 's';
+
+            SetText(profiler.Text, buffer, bufferIndex, Color.white);
         }
 
         private static char[] ToCharArray(StringBuilder stringBuilder)
