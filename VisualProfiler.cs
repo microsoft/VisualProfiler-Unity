@@ -210,10 +210,7 @@ namespace Microsoft.MixedReality.Profiling
         [System.Serializable]
         private class CustomProfiler
         {
-            /// <summary>
-            /// TODO
-            /// </summary>
-            public enum CategoryType
+            public enum Category
             {
                 None = 0,
                 VirtualTexturing,
@@ -236,46 +233,125 @@ namespace Microsoft.MixedReality.Profiling
                 Internal,
             }
 
-            [Tooltip("TODO")]
-            public string DisplayName;
-
-            [Tooltip("TODO")]
-            public CategoryType Category = CategoryType.None;
-            
-            [Tooltip("TODO")]
-            public string StatName;
-            
-            [Min(1), Tooltip("TODO")]
-            public int Capacity = 1;
-
-            public ProfilerRecorder Recorder { get; set; }
-            
             public TextData Text { get; set; }
 
-            public static ProfilerCategory ToProfilerCategory(CategoryType category)
+            public float LastValuePresented { get; set; }
+
+            public string DisplayName
+            {
+                get { return displayName; }
+                set { displayName = value; }
+            }
+
+            [SerializeField, Tooltip("TODO")]
+            private string displayName;
+
+            [SerializeField, Tooltip("TODO")]
+            private Category category = Category.None;
+            
+            [SerializeField, Tooltip("TODO")]
+            private string statName;
+
+            [SerializeField, Min(1), Tooltip("TODO")]
+            private int capacity = 1;
+
+            private bool hasEverPresented = false;
+            private bool running = false;
+            private ProfilerRecorder recorder;
+
+            // TEMP
+            public CustomProfiler(string displayName, Category category, string statName, int capacity)
+            {
+                this.displayName = displayName;
+                this.category = category;
+                this.statName = statName;
+                this.capacity = capacity;
+            }
+            // TEMP
+
+            public void Start()
+            {
+                if (category == Category.None)
+                {
+                    recorder = ProfilerRecorder.StartNew(new ProfilerMarker(statName), capacity);
+                }
+                else
+                {
+                    recorder = ProfilerRecorder.StartNew(ToProfilerCategory(category), statName, capacity);
+                }
+
+                running = true;
+            }
+
+            public void Stop()
+            {
+                recorder.Dispose();
+
+                running = false;
+            }
+
+            public bool ReadyToPresent()
+            {
+                return running && (recorder.Count == capacity) || (hasEverPresented == false);
+            }
+
+            public void Present(float value)
+            {
+                hasEverPresented = true;
+                LastValuePresented = value;
+            }
+
+            public float CalculateAverage()
+            {
+                if (!running)
+                {
+                    return 0.0f;
+                }
+
+                long sum = 0;
+                int length = 0;
+                int count = recorder.Count;
+
+                for (int i = 0; i < count; ++i)
+                {
+                    var value = recorder.GetSample(i).Value;
+
+                    if (value == 0)
+                    {
+                        continue;
+                    }
+
+                    sum += value;
+                    ++length;
+                }
+
+                return (length > 0) ? (float)sum / length : 0.0f;
+            }
+
+            private static ProfilerCategory ToProfilerCategory(Category category)
             {
                 switch (category)
                 {
                     default:
-                    case CategoryType.None:             return new ProfilerCategory();
-                    case CategoryType.VirtualTexturing: return ProfilerCategory.VirtualTexturing;
-                    case CategoryType.Memory:           return ProfilerCategory.Memory;
-                    case CategoryType.Input:            return ProfilerCategory.Input;
-                    case CategoryType.Vr:               return ProfilerCategory.Vr;
-                    case CategoryType.Loading:          return ProfilerCategory.Loading;
-                    case CategoryType.Network:          return ProfilerCategory.Network;
-                    case CategoryType.Lighting:         return ProfilerCategory.Lighting;
-                    case CategoryType.Particles:        return ProfilerCategory.Particles;
-                    case CategoryType.Video:            return ProfilerCategory.Video;
-                    case CategoryType.Audio:            return ProfilerCategory.Audio;
-                    case CategoryType.Ai:               return ProfilerCategory.Ai;
-                    case CategoryType.Animation:        return ProfilerCategory.Animation;
-                    case CategoryType.Physics:          return ProfilerCategory.Physics;
-                    case CategoryType.Gui:              return ProfilerCategory.Gui;
-                    case CategoryType.Scripts:          return ProfilerCategory.Scripts;
-                    case CategoryType.Render:           return ProfilerCategory.Render;
-                    case CategoryType.FileIO:           return ProfilerCategory.FileIO;
-                    case CategoryType.Internal:         return ProfilerCategory.Internal;
+                    case Category.None:             return new ProfilerCategory();
+                    case Category.VirtualTexturing: return ProfilerCategory.VirtualTexturing;
+                    case Category.Memory:           return ProfilerCategory.Memory;
+                    case Category.Input:            return ProfilerCategory.Input;
+                    case Category.Vr:               return ProfilerCategory.Vr;
+                    case Category.Loading:          return ProfilerCategory.Loading;
+                    case Category.Network:          return ProfilerCategory.Network;
+                    case Category.Lighting:         return ProfilerCategory.Lighting;
+                    case Category.Particles:        return ProfilerCategory.Particles;
+                    case Category.Video:            return ProfilerCategory.Video;
+                    case Category.Audio:            return ProfilerCategory.Audio;
+                    case Category.Ai:               return ProfilerCategory.Ai;
+                    case Category.Animation:        return ProfilerCategory.Animation;
+                    case Category.Physics:          return ProfilerCategory.Physics;
+                    case Category.Gui:              return ProfilerCategory.Gui;
+                    case Category.Scripts:          return ProfilerCategory.Scripts;
+                    case Category.Render:           return ProfilerCategory.Render;
+                    case Category.FileIO:           return ProfilerCategory.FileIO;
+                    case Category.Internal:         return ProfilerCategory.Internal;
                 }
             }
         }
@@ -422,20 +498,8 @@ namespace Microsoft.MixedReality.Profiling
             // TEMP
             customProfilers = new CustomProfiler[]
             {
-                new CustomProfiler()
-                {
-                    DisplayName = "Phyx",
-                    Category = CustomProfiler.CategoryType.Physics,
-                    StatName = "Physics.Processing",
-                    Capacity = 300,
-                },
-                new CustomProfiler()
-                {
-                    DisplayName = "Script",
-                    Category = CustomProfiler.CategoryType.Scripts,
-                    StatName = "BehaviourUpdate",
-                    Capacity = 300,
-                },
+                new CustomProfiler("Phyx", CustomProfiler.Category.Physics, "Physics.Processing", 300),
+                new CustomProfiler("Script", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
             };
             // TEMP
 
@@ -465,14 +529,7 @@ namespace Microsoft.MixedReality.Profiling
 
             foreach (var profiler in customProfilers)
             {
-                if (profiler.Category == CustomProfiler.CategoryType.None)
-                {
-                    profiler.Recorder = ProfilerRecorder.StartNew(new ProfilerMarker(profiler.StatName), profiler.Capacity);
-                }
-                else
-                {
-                    profiler.Recorder = ProfilerRecorder.StartNew(CustomProfiler.ToProfilerCategory(profiler.Category), profiler.StatName, profiler.Capacity);
-                }
+                profiler.Start();
             }
 
             BuildWindow();
@@ -495,7 +552,7 @@ namespace Microsoft.MixedReality.Profiling
 
             foreach (var profiler in customProfilers)
             {
-                profiler.Recorder.Dispose();
+                profiler.Stop();
             }
 
             meshStatsRecorder.Dispose();
@@ -691,7 +748,16 @@ namespace Microsoft.MixedReality.Profiling
                 // Update custom profilers
                 foreach (var profiler in customProfilers)
                 {
-                    MillisecondsToString(stringBuffer, displayedDecimalDigits, profiler);
+                    if (profiler.ReadyToPresent())
+                    {
+                        float milliseconds = profiler.CalculateAverage() * 1e-6f;
+
+                        if (WillDisplayedMillisecondsDiffer(profiler.LastValuePresented, milliseconds, displayedDecimalDigits))
+                        {
+                            profiler.Present(milliseconds);
+                            MillisecondsToString(stringBuffer, displayedDecimalDigits, profiler.Text, milliseconds);
+                        }
+                    }
                 }
 
                 // Render.
@@ -1113,40 +1179,21 @@ namespace Microsoft.MixedReality.Profiling
             SetText(data, buffer, bufferIndex, Color.white);
         }
 
-        private void MillisecondsToString(char[] buffer, int displayedDecimalDigits, CustomProfiler profiler)
+        private void MillisecondsToString(char[] buffer, int displayedDecimalDigits, TextData data, float milliseconds)
         {
             int bufferIndex = 0;
 
-            for (int i = 0; i < profiler.Text.Prefix.Length; ++i)
+            for (int i = 0; i < data.Prefix.Length; ++i)
             {
-                buffer[bufferIndex++] = profiler.Text.Prefix[i];
+                buffer[bufferIndex++] = data.Prefix[i];
             }
 
-            long sum = 0;
-            int length = 0;
-            int count = profiler.Recorder.Count;
-
-            for (int i = 0; i < count; ++i)
-            {
-                var value = profiler.Recorder.GetSample(i).Value;
-
-                if (value == 0)
-                {
-                    continue;
-                }
-
-                sum += value;
-                ++length;
-            }
-
-            float average = (length > 0) ? (float)sum / length : 0.0f;
-
-            bufferIndex = FtoA(average * 1e-6f, displayedDecimalDigits, buffer, bufferIndex);
+            bufferIndex = FtoA(milliseconds, displayedDecimalDigits, buffer, bufferIndex);
 
             buffer[bufferIndex++] = 'm';
             buffer[bufferIndex++] = 's';
 
-            SetText(profiler.Text, buffer, bufferIndex, Color.white);
+            SetText(data, buffer, bufferIndex, Color.white);
         }
 
         private static char[] ToCharArray(StringBuilder stringBuilder)
@@ -1240,6 +1287,13 @@ namespace Microsoft.MixedReality.Profiling
                 return ConvertMegabytesToBytes(SystemInfo.systemMemorySize);
 #endif
             }
+        }
+
+        private static bool WillDisplayedMillisecondsDiffer(float oldMilliseconds, float newMilliseconds, int displayedDecimalDigits)
+        {
+            float decimalPower = Mathf.Pow(10.0f, displayedDecimalDigits);
+
+            return (int)(oldMilliseconds * decimalPower) != (int)(newMilliseconds * decimalPower);
         }
 
         private static bool WillDisplayedMeshStatsCountDiffer(long oldCount, long newCount, int displayedDecimalDigits)
