@@ -4,10 +4,8 @@
 using System;
 using System.Text;
 using Unity.Profiling;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Profiling;
-using static UnityEngine.ParticleSystem;
 
 #if UNITY_STANDALONE_WIN || UNITY_WSA
 using UnityEngine.Windows.Speech;
@@ -233,51 +231,45 @@ namespace Microsoft.MixedReality.Profiling
                 Internal,
             }
 
+            [Tooltip("TODO")]
+            public string DisplayName;
+
+            [Tooltip("TODO")]
+            public Category CategoryType = Category.None;
+            
+            [Tooltip("TODO")]
+            public string StatName;
+
+            [Min(1), Tooltip("TODO")]
+            public int SampleCapacity = 300;
+
             public TextData Text { get; set; }
 
             public float LastValuePresented { get; set; }
-
-            public string DisplayName
-            {
-                get { return displayName; }
-                set { displayName = value; }
-            }
-
-            [SerializeField, Tooltip("TODO")]
-            private string displayName;
-
-            [SerializeField, Tooltip("TODO")]
-            private Category category = Category.None;
-            
-            [SerializeField, Tooltip("TODO")]
-            private string statName;
-
-            [SerializeField, Min(1), Tooltip("TODO")]
-            private int capacity = 1;
 
             private bool hasEverPresented = false;
             private bool running = false;
             private ProfilerRecorder recorder;
 
             // TEMP
-            public CustomProfiler(string displayName, Category category, string statName, int capacity)
+            public CustomProfiler(string name, Category category, string stat, int capacity)
             {
-                this.displayName = displayName;
-                this.category = category;
-                this.statName = statName;
-                this.capacity = capacity;
+                DisplayName = name;
+                CategoryType = category;
+                StatName = stat;
+                SampleCapacity = capacity;
             }
             // TEMP
 
             public void Start()
             {
-                if (category == Category.None)
+                if (CategoryType == Category.None)
                 {
-                    recorder = ProfilerRecorder.StartNew(new ProfilerMarker(statName), capacity);
+                    recorder = ProfilerRecorder.StartNew(new ProfilerMarker(StatName), SampleCapacity);
                 }
                 else
                 {
-                    recorder = ProfilerRecorder.StartNew(ToProfilerCategory(category), statName, capacity);
+                    recorder = ProfilerRecorder.StartNew(ToProfilerCategory(CategoryType), StatName, SampleCapacity);
                 }
 
                 running = true;
@@ -292,7 +284,7 @@ namespace Microsoft.MixedReality.Profiling
 
             public bool ReadyToPresent()
             {
-                return running && (recorder.Count == capacity) || (hasEverPresented == false);
+                return running && (recorder.Count == SampleCapacity) || (hasEverPresented == false);
             }
 
             public void Present(float value)
@@ -356,8 +348,7 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        [Header("Custom Profilers")]
-        [SerializeField, Tooltip("TODO")]
+        [SerializeField, Tooltip("Populate this list with ProfilerRecorder profiler markers to display timing information.")]
         private CustomProfiler[] customProfilers = new CustomProfiler[0];
 
         // Constants.
@@ -498,7 +489,7 @@ namespace Microsoft.MixedReality.Profiling
             // TEMP
             customProfilers = new CustomProfiler[]
             {
-                new CustomProfiler("Phyx", CustomProfiler.Category.Physics, "Physics.Processing", 300),
+                new CustomProfiler("123456789ABCDEFGHI", CustomProfiler.Category.Physics, "Physics.Processing", 300),
                 new CustomProfiler("Script", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
                 new CustomProfiler("Test 1", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
                 new CustomProfiler("Test 2", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
@@ -921,7 +912,12 @@ namespace Microsoft.MixedReality.Profiling
                     {
                         var profiler = customProfilers[row + column];
                         bool rightAlign = (column == 2) ? true : false;
-                        profiler.Text = new TextData(new Vector3(edges[column], height, 0.0f), rightAlign, offset, $"{profiler.DisplayName}: ");
+
+                        // Allow for at least 8 digits other than the prefix.
+                        int maxPrefixLength = maxStringLength - 8;
+                        string prefix = (profiler.DisplayName.Length > maxPrefixLength) ? profiler.DisplayName.Substring(0, maxPrefixLength) : profiler.DisplayName;
+
+                        profiler.Text = new TextData(new Vector3(edges[column], height, 0.0f), rightAlign, offset, $"{prefix}: ");
                         LayoutText(profiler.Text);
 
                         offset += maxStringLength;
