@@ -500,6 +500,9 @@ namespace Microsoft.MixedReality.Profiling
             {
                 new CustomProfiler("Phyx", CustomProfiler.Category.Physics, "Physics.Processing", 300),
                 new CustomProfiler("Script", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
+                new CustomProfiler("Test 1", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
+                new CustomProfiler("Test 2", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
+                new CustomProfiler("Test 3", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
             };
             // TEMP
 
@@ -814,8 +817,9 @@ namespace Microsoft.MixedReality.Profiling
             Vector4 spaceUV = characterUVs[' '];
 
             Vector3 defaultWindowSize = new Vector3(0.2f, 0.04f, 1.0f);
-            float edgeX = defaultWindowSize.x * 0.5f;
-
+            float edge = defaultWindowSize.x * 0.5f;
+            float[] edges = new float[] { -edge, -0.03f, edge };
+  
             // Set the default base color.
             for (int i = 0; i < instanceBaseColors.Length; ++i)
             {
@@ -833,9 +837,9 @@ namespace Microsoft.MixedReality.Profiling
             // Add frame rate text.
             {
                 float height = 0.02f;
-                cpuFrameRateText = new TextData(new Vector3(-edgeX, height, 0.0f), false, cpuframeRateTextOffset);
+                cpuFrameRateText = new TextData(new Vector3(edges[0], height, 0.0f), false, cpuframeRateTextOffset);
                 LayoutText(cpuFrameRateText);
-                gpuFrameRateText = new TextData(new Vector3(edgeX, height, 0.0f), true, gpuframeRateTextOffset);
+                gpuFrameRateText = new TextData(new Vector3(edges[2], height, 0.0f), true, gpuframeRateTextOffset);
                 LayoutText(gpuFrameRateText);
             }
 
@@ -860,11 +864,11 @@ namespace Microsoft.MixedReality.Profiling
             // Add scene statistics text.
             {
                 float height = 0.0045f;
-                batchesText = new TextData(new Vector3(-edgeX, height, 0.0f), false, batchesTextOffset, "Batches: ");
+                batchesText = new TextData(new Vector3(edges[0], height, 0.0f), false, batchesTextOffset, "Batches: ");
                 LayoutText(batchesText);
-                drawCallText = new TextData(new Vector3(-0.03f, height, 0.0f), false, drawCallTextOffset, "Draw Calls: ");
+                drawCallText = new TextData(new Vector3(edges[1], height, 0.0f), false, drawCallTextOffset, "Draw Calls: ");
                 LayoutText(drawCallText);
-                meshText = new TextData(new Vector3(edgeX, height, 0.0f), true, meshStatsTextOffset, displayTriangleCount ? "Tris: " : "Verts: ");
+                meshText = new TextData(new Vector3(edges[2], height, 0.0f), true, meshStatsTextOffset, displayTriangleCount ? "Tris: " : "Verts: ");
                 LayoutText(meshText);
             }
 
@@ -898,11 +902,11 @@ namespace Microsoft.MixedReality.Profiling
             // Add memory usage text.
             {
                 float height = -0.011f;
-                usedMemoryText = new TextData(new Vector3(-edgeX, height, 0.0f), false, usedMemoryTextOffset, "Used: ");
+                usedMemoryText = new TextData(new Vector3(edges[0], height, 0.0f), false, usedMemoryTextOffset, "Used: ");
                 LayoutText(usedMemoryText);
-                peakMemoryText = new TextData(new Vector3(-0.03f, height, 0.0f), false, peakMemoryTextOffset, "Peak: ");
+                peakMemoryText = new TextData(new Vector3(edges[1], height, 0.0f), false, peakMemoryTextOffset, "Peak: ");
                 LayoutText(peakMemoryText);
-                limitMemoryText = new TextData(new Vector3(edgeX, height, 0.0f), true, limitMemoryTextOffset, "Limit: ");
+                limitMemoryText = new TextData(new Vector3(edges[2], height, 0.0f), true, limitMemoryTextOffset, "Limit: ");
                 LayoutText(limitMemoryText);
             }
 
@@ -910,12 +914,19 @@ namespace Microsoft.MixedReality.Profiling
             {
                 int offset = lastOffset;
                 float height = -0.02f;
-                foreach (var profiler in customProfilers)
-                {
-                    profiler.Text = new TextData(new Vector3(-edgeX, height, 0.0f), false, offset, $"{profiler.DisplayName}: ");
-                    LayoutText(profiler.Text);
 
-                    offset += maxStringLength;
+                for (int row = 0; row < customProfilers.Length; row += 3)
+                {
+                    for (int column = 0; (column < 3) && ((row + column) < customProfilers.Length); ++column)
+                    {
+                        var profiler = customProfilers[row + column];
+                        bool rightAlign = (column == 2) ? true : false;
+                        profiler.Text = new TextData(new Vector3(edges[column], height, 0.0f), rightAlign, offset, $"{profiler.DisplayName}: ");
+                        LayoutText(profiler.Text);
+
+                        offset += maxStringLength;
+                    }
+
                     height -= characterScale.y;
                 }
             }
