@@ -164,6 +164,17 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
+        /// <summary>
+        /// Returns the target frame time in milliseconds for the current platform.
+        /// </summary>
+        public float TargetFrameTime
+        {
+            get
+            {
+                return (1.0f / TargetFrameRate) * 1000.0f;
+            }
+        }
+
         [SerializeField, Tooltip("Voice commands to toggle the profiler on and off. (Supported in UWP only.)")]
         private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
 
@@ -205,7 +216,7 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Min(1), Tooltip("How many characters are in a row of the font texture.")]
         private int fontColumns = 32;
 
-        [System.Serializable]
+        [Serializable]
         private class CustomProfiler
         {
             public enum Category
@@ -231,17 +242,20 @@ namespace Microsoft.MixedReality.Profiling
                 Internal,
             }
 
-            [Tooltip("TODO")]
+            [Tooltip("The visible name of the stat in the profiler. This should be no longer than 9 characters.")]
             public string DisplayName;
 
-            [Tooltip("TODO")]
+            [Tooltip("The category to pass to ProfilerRecorder.StartNew. If \"None\" is specified ProfilerRecorder.StartNew will be invoked with a new ProfilerMarker named StatName.")]
             public Category CategoryType = Category.None;
             
-            [Tooltip("TODO")]
+            [Tooltip("Profiler marker or counter name.")]
             public string StatName;
 
-            [Min(1), Tooltip("TODO")]
+            [Min(1), Tooltip("The amount of samples to collect then average when displaying the profiler marker.")]
             public int SampleCapacity = 300;
+
+            [Range(0.0f, 1.0f), Tooltip("What % of the target frame time can this profiler take before being considered over budget?")]
+            public float BudgetPercentage = 1.0f;
 
             public TextData Text { get; set; }
 
@@ -252,12 +266,13 @@ namespace Microsoft.MixedReality.Profiling
             private ProfilerRecorder recorder;
 
             // TEMP
-            public CustomProfiler(string name, Category category, string stat, int capacity)
+            public CustomProfiler(string name, Category category, string stat, int capacity, float budget)
             {
                 DisplayName = name;
                 CategoryType = category;
                 StatName = stat;
                 SampleCapacity = capacity;
+                BudgetPercentage = budget;
             }
             // TEMP
 
@@ -280,6 +295,12 @@ namespace Microsoft.MixedReality.Profiling
                 recorder.Dispose();
 
                 running = false;
+            }
+
+            public void Reset()
+            {
+                hasEverPresented = false;
+                LastValuePresented = -1.0f;
             }
 
             public bool ReadyToPresent()
@@ -489,11 +510,11 @@ namespace Microsoft.MixedReality.Profiling
             // TEMP
             customProfilers = new CustomProfiler[]
             {
-                new CustomProfiler("123456789ABCDEFGHI", CustomProfiler.Category.Physics, "Physics.Processing", 300),
-                new CustomProfiler("Script", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
-                new CustomProfiler("Test 1", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
-                new CustomProfiler("Test 2", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
-                new CustomProfiler("Test 3", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300),
+                new CustomProfiler("Physics", CustomProfiler.Category.Physics, "Physics.Processing", 300, 0.2f),
+                new CustomProfiler("Script", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
+                new CustomProfiler("Test 1", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
+                new CustomProfiler("Test 2", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
+                new CustomProfiler("Test 3", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
             };
             // TEMP
 
@@ -749,7 +770,10 @@ namespace Microsoft.MixedReality.Profiling
                         if (WillDisplayedMillisecondsDiffer(profiler.LastValuePresented, milliseconds, displayedDecimalDigits))
                         {
                             profiler.Present(milliseconds);
-                            MillisecondsToString(stringBuffer, displayedDecimalDigits, profiler.Text, milliseconds);
+
+                            float budget = TargetFrameTime * profiler.BudgetPercentage;
+                            Color color = milliseconds <= budget ? targetFrameRateColor : missedFrameRateColor;
+                            MillisecondsToString(stringBuffer, displayedDecimalDigits, profiler.Text, milliseconds, color);
                         }
                     }
                 }
@@ -921,6 +945,8 @@ namespace Microsoft.MixedReality.Profiling
                         LayoutText(profiler.Text);
 
                         offset += maxStringLength;
+
+                        profiler.Reset();
                     }
 
                     height -= characterScale.y;
@@ -1186,7 +1212,7 @@ namespace Microsoft.MixedReality.Profiling
             SetText(data, buffer, bufferIndex, Color.white);
         }
 
-        private void MillisecondsToString(char[] buffer, int displayedDecimalDigits, TextData data, float milliseconds)
+        private void MillisecondsToString(char[] buffer, int displayedDecimalDigits, TextData data, float milliseconds, Color color)
         {
             int bufferIndex = 0;
 
@@ -1200,7 +1226,7 @@ namespace Microsoft.MixedReality.Profiling
             buffer[bufferIndex++] = 'm';
             buffer[bufferIndex++] = 's';
 
-            SetText(data, buffer, bufferIndex, Color.white);
+            SetText(data, buffer, bufferIndex, color);
         }
 
         private static char[] ToCharArray(StringBuilder stringBuilder)
