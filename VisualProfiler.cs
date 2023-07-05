@@ -34,7 +34,7 @@ namespace Microsoft.MixedReality.Profiling
     /// Visual Studio Package.appxmanifest capabilities.
     /// 
     /// </summary>
-    public sealed class VisualProfiler : MonoBehaviour
+    public sealed class VisualProfiler : MonoBehaviour, ISerializationCallbackReceiver
     {
         [Header("Profiler Settings")]
         [SerializeField, Tooltip("Is the profiler currently visible? If disabled, prevents the profiler from rendering but still allows it to track memory usage.")]
@@ -258,23 +258,11 @@ namespace Microsoft.MixedReality.Profiling
             public float BudgetPercentage = 1.0f;
 
             public TextData Text { get; set; }
-
             public float LastValuePresented { get; set; }
 
             private bool hasEverPresented = false;
             private bool running = false;
             private ProfilerRecorder recorder;
-
-            // TEMP
-            public CustomProfiler(string name, Category category, string stat, int capacity, float budget)
-            {
-                DisplayName = name;
-                CategoryType = category;
-                StatName = stat;
-                SampleCapacity = capacity;
-                BudgetPercentage = budget;
-            }
-            // TEMP
 
             public void Start()
             {
@@ -507,17 +495,6 @@ namespace Microsoft.MixedReality.Profiling
                 Debug.LogError("The VisualProfiler is missing a material and will not display.");
             }
 
-            // TEMP
-            customProfilers = new CustomProfiler[]
-            {
-                new CustomProfiler("Physics", CustomProfiler.Category.Physics, "Physics.Processing", 300, 0.2f),
-                new CustomProfiler("Script", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
-                new CustomProfiler("Test 1", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
-                new CustomProfiler("Test 2", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
-                new CustomProfiler("Test 3", CustomProfiler.Category.Scripts, "BehaviourUpdate", 300, 1.0f),
-            };
-            // TEMP
-
             // Create a quad mesh with artificially large bounds to disable culling for instanced rendering.
             // TODO - [Cameron-Micka] Use shared mesh with normal bounds once Unity allows for more control over instance culling.
             if (quadMesh == null)
@@ -578,6 +555,22 @@ namespace Microsoft.MixedReality.Profiling
         private void OnValidate()
         {
             BuildWindow();
+        }
+
+        public void OnBeforeSerialize()
+        {
+            // Default values for serializable classes in arrays/lists are not supported. This ensures correct construction.
+            for (int i = 0; i < customProfilers.Length; ++i)
+            {
+                if (customProfilers[i].SampleCapacity == 0)
+                {
+                    customProfilers[i] = new CustomProfiler();
+                }
+            }
+        }
+
+        public void OnAfterDeserialize()
+        {
         }
 
         private void LateUpdate()
