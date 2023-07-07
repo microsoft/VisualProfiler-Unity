@@ -364,7 +364,9 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     foreach (var marker in Markers)
                     {
-                        if (marker.recorder.Count == SampleCapacity)
+                        // Valid will return false when in a release build that doesn't support the recorder.
+                        if (marker.recorder.Valid && 
+                            marker.recorder.Count == SampleCapacity)
                         {
                             return true;
                         }
@@ -410,7 +412,8 @@ namespace Microsoft.MixedReality.Profiling
         private const int usedInstanceOffset = peakInstanceOffset + 1;
 
         private const int cpuframeRateTextOffset = usedInstanceOffset + 1;
-        private const int gpuframeRateTextOffset = cpuframeRateTextOffset + maxStringLength;
+        private const int qualityLevelTextOffset = cpuframeRateTextOffset + maxStringLength;
+        private const int gpuframeRateTextOffset = qualityLevelTextOffset + maxStringLength;
 
         private const int batchesTextOffset = gpuframeRateTextOffset + maxStringLength;
         private const int drawCallTextOffset = batchesTextOffset + maxStringLength;
@@ -429,6 +432,7 @@ namespace Microsoft.MixedReality.Profiling
         private static readonly int windowLocalToWorldID = Shader.PropertyToID("_WindowLocalToWorldMatrix");
 
         // Pre computed state.
+        private char[][] qualityLevelStrings = new char[0][];
         private char[][] frameRateStrings = new char[maxTargetFrameRate + 1][];
         private char[][] gpuFrameRateStrings = new char[maxTargetFrameRate + 1][];
         private Vector4[] characterUVs = new Vector4[128];
@@ -457,6 +461,7 @@ namespace Microsoft.MixedReality.Profiling
         }
 
         private TextData cpuFrameRateText = null;
+        private TextData qualityLevelText = null;
         private TextData gpuFrameRateText = null;
 
         private TextData batchesText = null;
@@ -474,6 +479,7 @@ namespace Microsoft.MixedReality.Profiling
 
         private char[] stringBuffer = new char[maxStringLength];
 
+        private int qualityLevel = -1;
         private int cpuFrameRate = -1;
         private int gpuFrameRate = -1;
         private long batches = 0;
@@ -513,6 +519,7 @@ namespace Microsoft.MixedReality.Profiling
         {
             SmoothCpuFrameRate = 0.0f;
             SmoothGpuFrameRate = 0.0f;
+            qualityLevel = -1;
             cpuFrameRate = -1;
             gpuFrameRate = -1;
             batches = 0;
@@ -630,6 +637,16 @@ namespace Microsoft.MixedReality.Profiling
                         // Lerp rather than slerp for speed over quality.
                         windowRotation = Quaternion.Lerp(windowRotation, CalculateWindowRotation(cameraTransform), t);
                     }
+                }
+
+                // Update quality level text.
+                int lastQualityLevel = QualitySettings.GetQualityLevel();
+
+                if (lastQualityLevel != qualityLevel)
+                {
+                    char[] text = qualityLevelStrings[lastQualityLevel];
+                    SetText(qualityLevelText, text, text.Length, Color.white);
+                    qualityLevel = lastQualityLevel;
                 }
 
                 // Many platforms do not yet support the FrameTimingManager. When timing data is returned from the FrameTimingManager we will use
@@ -854,6 +871,7 @@ namespace Microsoft.MixedReality.Profiling
 
         private void BuildWindow()
         {
+            BuildQualityLevelStrings();
             BuildFrameRateStrings();
             BuildCharacterUVs();
 
@@ -883,11 +901,13 @@ namespace Microsoft.MixedReality.Profiling
                 instanceUVOffsetScaleX[backplateInstanceOffset] = spaceUV;
             }
 
-            // Add frame rate text.
+            // Add frame rate and quality level text.
             {
                 float height = 0.02f;
                 cpuFrameRateText = new TextData(new Vector3(edges[0], height, 0.0f), false, cpuframeRateTextOffset);
                 LayoutText(cpuFrameRateText);
+                qualityLevelText = new TextData(new Vector3(edges[1], height, 0.0f), false, qualityLevelTextOffset);
+                LayoutText(qualityLevelText);
                 gpuFrameRateText = new TextData(new Vector3(edges[2], height, 0.0f), true, gpuframeRateTextOffset);
                 LayoutText(gpuFrameRateText);
             }
@@ -999,6 +1019,20 @@ namespace Microsoft.MixedReality.Profiling
             }
 
             Refresh();
+        }
+
+        private void BuildQualityLevelStrings()
+        {
+            string prefix = "Quality: ";
+            string[] names = QualitySettings.names;
+            qualityLevelStrings = new char[names.Length][];
+            
+            for (int i = 0; i < names.Length; ++i)
+            {
+                var name = prefix + names[i];
+                string shortName = (name.Length > maxStringLength) ? name.Substring(0, maxStringLength) : name;
+                qualityLevelStrings[i] = shortName.ToCharArray();
+            }
         }
 
         private void BuildFrameRateStrings()
