@@ -216,40 +216,102 @@ namespace Microsoft.MixedReality.Profiling
         [SerializeField, Min(1), Tooltip("How many characters are in a row of the font texture.")]
         private int fontColumns = 32;
 
+        /// <summary>
+        /// Describes a group of Unity Profiler marker. Common markers are listed here: https://docs.unity3d.com/Manual/profiler-markers.html 
+        /// </summary>
         [Serializable]
-        private class CustomProfiler
+        private class ProfilerGroup
         {
-            public enum Category
-            {
-                None = 0,
-                VirtualTexturing,
-                Memory,
-                Input,
-                Vr,
-                Loading,
-                Network,
-                Lighting,
-                Particles,
-                Video,
-                Audio,
-                Ai,
-                Animation,
-                Physics,
-                Gui,
-                Scripts,
-                Render,
-                FileIO,
-                Internal,
-            }
-
-            [Tooltip("The visible name of the stat in the profiler. This should be no longer than 9 characters.")]
+            [Tooltip("The visible name of this group in the Visual Profiler. This should be no longer than 9 characters.")]
             public string DisplayName;
 
-            [Tooltip("The category to pass to ProfilerRecorder.StartNew. If \"None\" is specified ProfilerRecorder.StartNew will be invoked with a new ProfilerMarker named StatName.")]
-            public Category CategoryType = Category.None;
-            
-            [Tooltip("Profiler marker or counter name.")]
-            public string StatName;
+            [Serializable]
+            public class Marker
+            {
+                public enum Category
+                {
+                    None = 0,
+                    VirtualTexturing,
+                    Memory,
+                    Input,
+                    Vr,
+                    Loading,
+                    Network,
+                    Lighting,
+                    Particles,
+                    Video,
+                    Audio,
+                    Ai,
+                    Animation,
+                    Physics,
+                    Gui,
+                    Scripts,
+                    Render,
+                    FileIO,
+                    Internal,
+                }
+
+                public static ProfilerCategory ToProfilerCategory(Category category)
+                {
+                    switch (category)
+                    {
+                        default:
+                        case Category.None: return new ProfilerCategory();
+                        case Category.VirtualTexturing: return ProfilerCategory.VirtualTexturing;
+                        case Category.Memory: return ProfilerCategory.Memory;
+                        case Category.Input: return ProfilerCategory.Input;
+                        case Category.Vr: return ProfilerCategory.Vr;
+                        case Category.Loading: return ProfilerCategory.Loading;
+                        case Category.Network: return ProfilerCategory.Network;
+                        case Category.Lighting: return ProfilerCategory.Lighting;
+                        case Category.Particles: return ProfilerCategory.Particles;
+                        case Category.Video: return ProfilerCategory.Video;
+                        case Category.Audio: return ProfilerCategory.Audio;
+                        case Category.Ai: return ProfilerCategory.Ai;
+                        case Category.Animation: return ProfilerCategory.Animation;
+                        case Category.Physics: return ProfilerCategory.Physics;
+                        case Category.Gui: return ProfilerCategory.Gui;
+                        case Category.Scripts: return ProfilerCategory.Scripts;
+                        case Category.Render: return ProfilerCategory.Render;
+                        case Category.FileIO: return ProfilerCategory.FileIO;
+                        case Category.Internal: return ProfilerCategory.Internal;
+                    }
+                }
+
+                public float CalculateAverage()
+                {
+                    long sum = 0;
+                    int length = 0;
+                    int count = recorder.Count;
+
+                    for (int i = 0; i < count; ++i)
+                    {
+                        var value = recorder.GetSample(i).Value;
+
+                        if (value == 0)
+                        {
+                            continue;
+                        }
+
+                        sum += value;
+                        ++length;
+                    }
+
+                    return (length > 0) ? (float)sum / length : 0.0f;
+                }
+
+                [Tooltip("Profiler marker or counter name.")]
+                public string StatName;
+
+                [Tooltip("The category to pass to ProfilerRecorder.StartNew. If \"None\" is specified ProfilerRecorder.StartNew will be invoked with a new ProfilerMarker named StatName.")]
+                public Category CategoryType;
+
+                [NonSerialized]
+                public ProfilerRecorder recorder;
+            }
+
+            [Tooltip("List of profiler markers which make up this group.")]
+            public Marker[] Markers = new Marker[0];
 
             [Min(1), Tooltip("The amount of samples to collect then average when displaying the profiler marker.")]
             public int SampleCapacity = 300;
@@ -262,17 +324,19 @@ namespace Microsoft.MixedReality.Profiling
 
             private bool hasEverPresented = false;
             private bool running = false;
-            private ProfilerRecorder recorder;
 
             public void Start()
             {
-                if (CategoryType == Category.None)
+                foreach (var marker in Markers)
                 {
-                    recorder = ProfilerRecorder.StartNew(new ProfilerMarker(StatName), SampleCapacity);
-                }
-                else
-                {
-                    recorder = ProfilerRecorder.StartNew(ToProfilerCategory(CategoryType), StatName, SampleCapacity);
+                    if (marker.CategoryType == Marker.Category.None)
+                    {
+                        marker.recorder = ProfilerRecorder.StartNew(new ProfilerMarker(marker.StatName), SampleCapacity);
+                    }
+                    else
+                    {
+                        marker.recorder = ProfilerRecorder.StartNew(Marker.ToProfilerCategory(marker.CategoryType), marker.StatName, SampleCapacity);
+                    }
                 }
 
                 running = true;
@@ -280,7 +344,10 @@ namespace Microsoft.MixedReality.Profiling
 
             public void Stop()
             {
-                recorder.Dispose();
+                foreach (var marker in Markers)
+                {
+                    marker.recorder.Dispose();
+                }
 
                 running = false;
             }
@@ -293,7 +360,23 @@ namespace Microsoft.MixedReality.Profiling
 
             public bool ReadyToPresent()
             {
-                return running && (recorder.Count == SampleCapacity) || (hasEverPresented == false);
+                if (running)
+                {
+                    if (hasEverPresented == false)
+                    {
+                        return true;
+                    }
+
+                    foreach (var marker in Markers)
+                    {
+                        if (marker.recorder.Count == SampleCapacity)
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
             }
 
             public void Present(float value)
@@ -309,56 +392,26 @@ namespace Microsoft.MixedReality.Profiling
                     return 0.0f;
                 }
 
-                long sum = 0;
-                int length = 0;
-                int count = recorder.Count;
+                int count = Markers.Length;
 
-                for (int i = 0; i < count; ++i)
+                if (count == 0)
                 {
-                    var value = recorder.GetSample(i).Value;
-
-                    if (value == 0)
-                    {
-                        continue;
-                    }
-
-                    sum += value;
-                    ++length;
+                    return 0.0f;
                 }
 
-                return (length > 0) ? (float)sum / length : 0.0f;
-            }
+                float sum = 0.0f;
 
-            private static ProfilerCategory ToProfilerCategory(Category category)
-            {
-                switch (category)
+                foreach (var marker in Markers)
                 {
-                    default:
-                    case Category.None:             return new ProfilerCategory();
-                    case Category.VirtualTexturing: return ProfilerCategory.VirtualTexturing;
-                    case Category.Memory:           return ProfilerCategory.Memory;
-                    case Category.Input:            return ProfilerCategory.Input;
-                    case Category.Vr:               return ProfilerCategory.Vr;
-                    case Category.Loading:          return ProfilerCategory.Loading;
-                    case Category.Network:          return ProfilerCategory.Network;
-                    case Category.Lighting:         return ProfilerCategory.Lighting;
-                    case Category.Particles:        return ProfilerCategory.Particles;
-                    case Category.Video:            return ProfilerCategory.Video;
-                    case Category.Audio:            return ProfilerCategory.Audio;
-                    case Category.Ai:               return ProfilerCategory.Ai;
-                    case Category.Animation:        return ProfilerCategory.Animation;
-                    case Category.Physics:          return ProfilerCategory.Physics;
-                    case Category.Gui:              return ProfilerCategory.Gui;
-                    case Category.Scripts:          return ProfilerCategory.Scripts;
-                    case Category.Render:           return ProfilerCategory.Render;
-                    case Category.FileIO:           return ProfilerCategory.FileIO;
-                    case Category.Internal:         return ProfilerCategory.Internal;
+                    sum += marker.CalculateAverage();
                 }
+
+                return (float)sum / count;
             }
         }
 
         [SerializeField, Tooltip("Populate this list with ProfilerRecorder profiler markers to display timing information.")]
-        private CustomProfiler[] customProfilers = new CustomProfiler[0];
+        private ProfilerGroup[] ProfilerGroups = new ProfilerGroup[0];
 
         // Constants.
         private const int maxStringLength = 17;
@@ -519,9 +572,9 @@ namespace Microsoft.MixedReality.Profiling
             drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
             meshStatsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, displayTriangleCount ? "Triangles Count" : "Vertices Count");
 
-            foreach (var profiler in customProfilers)
+            foreach (var profilerGroup in ProfilerGroups)
             {
-                profiler.Start();
+                profilerGroup.Start();
             }
 
             BuildWindow();
@@ -542,9 +595,9 @@ namespace Microsoft.MixedReality.Profiling
             }
 #endif
 
-            foreach (var profiler in customProfilers)
+            foreach (var profilerGroup in ProfilerGroups)
             {
-                profiler.Stop();
+                profilerGroup.Stop();
             }
 
             meshStatsRecorder.Dispose();
@@ -560,18 +613,16 @@ namespace Microsoft.MixedReality.Profiling
         public void OnBeforeSerialize()
         {
             // Default values for serializable classes in arrays/lists are not supported. This ensures correct construction.
-            for (int i = 0; i < customProfilers.Length; ++i)
+            for (int i = 0; i < ProfilerGroups.Length; ++i)
             {
-                if (customProfilers[i].SampleCapacity == 0)
+                if (ProfilerGroups[i].SampleCapacity == 0)
                 {
-                    customProfilers[i] = new CustomProfiler();
+                    ProfilerGroups[i] = new ProfilerGroup();
                 }
             }
         }
 
-        public void OnAfterDeserialize()
-        {
-        }
+        public void OnAfterDeserialize() {}
 
         private void LateUpdate()
         {
@@ -753,20 +804,20 @@ namespace Microsoft.MixedReality.Profiling
                     peakMemoryUsageDirty = false;
                 }
 
-                // Update custom profilers
-                foreach (var profiler in customProfilers)
+                // Update profiler groups
+                foreach (var profilerGroup in ProfilerGroups)
                 {
-                    if (profiler.ReadyToPresent())
+                    if (profilerGroup.ReadyToPresent())
                     {
-                        float milliseconds = profiler.CalculateAverage() * 1e-6f;
+                        float milliseconds = profilerGroup.CalculateAverage() * 1e-6f;
 
-                        if (WillDisplayedMillisecondsDiffer(profiler.LastValuePresented, milliseconds, displayedDecimalDigits))
+                        if (WillDisplayedMillisecondsDiffer(profilerGroup.LastValuePresented, milliseconds, displayedDecimalDigits))
                         {
-                            profiler.Present(milliseconds);
+                            profilerGroup.Present(milliseconds);
 
-                            float budget = TargetFrameTime * profiler.BudgetPercentage;
+                            float budget = TargetFrameTime * profilerGroup.BudgetPercentage;
                             Color color = milliseconds <= budget ? targetFrameRateColor : missedFrameRateColor;
-                            MillisecondsToString(stringBuffer, displayedDecimalDigits, profiler.Text, milliseconds, color);
+                            MillisecondsToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, milliseconds, color);
                         }
                     }
                 }
@@ -816,7 +867,7 @@ namespace Microsoft.MixedReality.Profiling
             BuildFrameRateStrings();
             BuildCharacterUVs();
 
-            int instanceCount = lastOffset + (maxStringLength * customProfilers.Length);
+            int instanceCount = lastOffset + (maxStringLength * ProfilerGroups.Length);
             instanceMatrices = new Matrix4x4[instanceCount];
             instanceColors = new Vector4[instanceCount];
             instanceBaseColors = new Vector4[instanceCount];
@@ -923,23 +974,23 @@ namespace Microsoft.MixedReality.Profiling
                 int offset = lastOffset;
                 float height = -0.02f;
 
-                for (int row = 0; row < customProfilers.Length; row += 3)
+                for (int row = 0; row < ProfilerGroups.Length; row += 3)
                 {
-                    for (int column = 0; (column < 3) && ((row + column) < customProfilers.Length); ++column)
+                    for (int column = 0; (column < 3) && ((row + column) < ProfilerGroups.Length); ++column)
                     {
-                        var profiler = customProfilers[row + column];
+                        var profilerGroup = ProfilerGroups[row + column];
                         bool rightAlign = (column == 2) ? true : false;
 
                         // Allow for at least 8 digits other than the prefix.
                         int maxPrefixLength = maxStringLength - 8;
-                        string prefix = (profiler.DisplayName.Length > maxPrefixLength) ? profiler.DisplayName.Substring(0, maxPrefixLength) : profiler.DisplayName;
+                        string prefix = (profilerGroup.DisplayName.Length > maxPrefixLength) ? profilerGroup.DisplayName.Substring(0, maxPrefixLength) : profilerGroup.DisplayName;
 
-                        profiler.Text = new TextData(new Vector3(edges[column], height, 0.0f), rightAlign, offset, $"{prefix}: ");
-                        LayoutText(profiler.Text);
+                        profilerGroup.Text = new TextData(new Vector3(edges[column], height, 0.0f), rightAlign, offset, $"{prefix}: ");
+                        LayoutText(profilerGroup.Text);
 
                         offset += maxStringLength;
 
-                        profiler.Reset();
+                        profilerGroup.Reset();
                     }
 
                     height -= characterScale.y;
