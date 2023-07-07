@@ -321,8 +321,8 @@ namespace Microsoft.MixedReality.Profiling
 
             public TextData Text { get; set; }
             public float LastValuePresented { get; set; }
+            public bool HasEverPresented { get; set; }
 
-            private bool hasEverPresented = false;
             private bool running = false;
 
             public void Start()
@@ -354,7 +354,7 @@ namespace Microsoft.MixedReality.Profiling
 
             public void Reset()
             {
-                hasEverPresented = false;
+                HasEverPresented = false;
                 LastValuePresented = -1.0f;
             }
 
@@ -362,11 +362,6 @@ namespace Microsoft.MixedReality.Profiling
             {
                 if (running)
                 {
-                    if (hasEverPresented == false)
-                    {
-                        return true;
-                    }
-
                     foreach (var marker in Markers)
                     {
                         if (marker.recorder.Count == SampleCapacity)
@@ -379,22 +374,9 @@ namespace Microsoft.MixedReality.Profiling
                 return false;
             }
 
-            public void Present(float value)
-            {
-                hasEverPresented = true;
-                LastValuePresented = value;
-            }
-
             public float CalculateAverage()
             {
                 if (!running)
-                {
-                    return 0.0f;
-                }
-
-                int count = Markers.Length;
-
-                if (count == 0)
                 {
                     return 0.0f;
                 }
@@ -406,7 +388,7 @@ namespace Microsoft.MixedReality.Profiling
                     sum += marker.CalculateAverage();
                 }
 
-                return (float)sum / count;
+                return sum;
             }
         }
 
@@ -813,12 +795,20 @@ namespace Microsoft.MixedReality.Profiling
 
                         if (WillDisplayedMillisecondsDiffer(profilerGroup.LastValuePresented, milliseconds, displayedDecimalDigits))
                         {
-                            profilerGroup.Present(milliseconds);
+                            profilerGroup.HasEverPresented = true;
+                            profilerGroup.LastValuePresented = milliseconds;
 
                             float budget = TargetFrameTime * profilerGroup.BudgetPercentage;
                             Color color = milliseconds <= budget ? targetFrameRateColor : missedFrameRateColor;
                             MillisecondsToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, milliseconds, color);
                         }
+                    }
+                    else if (profilerGroup.HasEverPresented == false)
+                    {
+                        profilerGroup.HasEverPresented = true;
+                        profilerGroup.LastValuePresented = -1.0f;
+
+                        MillisecondsToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, -1.0f, Color.white);
                     }
                 }
 
@@ -1265,7 +1255,16 @@ namespace Microsoft.MixedReality.Profiling
                 buffer[bufferIndex++] = data.Prefix[i];
             }
 
-            bufferIndex = FtoA(milliseconds, displayedDecimalDigits, buffer, bufferIndex);
+            if (milliseconds >= 0.0f)
+            {
+                bufferIndex = FtoA(milliseconds, displayedDecimalDigits, buffer, bufferIndex);
+            }
+            else
+            {
+                buffer[bufferIndex++] = '-';
+                buffer[bufferIndex++] = '.';
+                buffer[bufferIndex++] = '-';
+            }
 
             buffer[bufferIndex++] = 'm';
             buffer[bufferIndex++] = 's';
