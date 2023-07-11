@@ -62,7 +62,7 @@ The profiler UI (such as anchoring, scale, follow behavior and UI color) can als
 
 ![Profiler Inspector](Documentation~/Images/ProfilerInspector.png)
 
-Custom profilers can be added to the bottom of the Visual Profiler by adding to the list of custom profilers. Custom profilers use Unity's [ProfilerRecorder](https://docs.unity3d.com/ScriptReference/Unity.Profiling.ProfilerRecorder.html) API. For example the below image shows how the "Physics.Processing" marker displays a millisecond average over 300 samples.
+Custom profilers can be added to the bottom of the Visual Profiler by adding to the list of "Profiler Groups." Profiler Groups use Unity's [ProfilerRecorder](https://docs.unity3d.com/ScriptReference/Unity.Profiling.ProfilerRecorder.html) API. For example the below image shows how the "BehaviorUpdate", "LateBehaviourUpdate", and "FixedBehaviourUpdate" markers display a millisecond average over 300 samples with the group label "Scripting."
 
 ![Custom Profilers](Documentation~/Images/CustomProfilers.png)
 
