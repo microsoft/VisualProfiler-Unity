@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using System.Text;
 using Unity.Profiling;
 using UnityEngine;
@@ -325,8 +326,10 @@ namespace Microsoft.MixedReality.Profiling
 
             private bool running = false;
 
-            public void Start()
+            public bool Start()
             {
+                bool anyValid = false;
+
                 foreach (var marker in Markers)
                 {
                     if (marker.CategoryType == Marker.Category.None)
@@ -337,9 +340,17 @@ namespace Microsoft.MixedReality.Profiling
                     {
                         marker.recorder = ProfilerRecorder.StartNew(Marker.ToProfilerCategory(marker.CategoryType), marker.StatName, SampleCapacity);
                     }
+
+                    // Valid will return false when in a release build that doesn't support the recorder.
+                    if (marker.recorder.Valid)
+                    {
+                        anyValid = true;
+                    }
                 }
 
                 running = true;
+
+                return anyValid;
             }
 
             public void Stop()
@@ -364,7 +375,6 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     foreach (var marker in Markers)
                     {
-                        // Valid will return false when in a release build that doesn't support the recorder.
                         if (marker.recorder.Valid && 
                             marker.recorder.Count == SampleCapacity)
                         {
@@ -499,6 +509,7 @@ namespace Microsoft.MixedReality.Profiling
         private ProfilerRecorder batchesRecorder;
         private ProfilerRecorder drawCallsRecorder;
         private ProfilerRecorder meshStatsRecorder;
+        private List<ProfilerGroup> activeProfilerGroups = new List<ProfilerGroup>();
 
         // Rendering state.
         private Mesh quadMesh;
@@ -563,7 +574,10 @@ namespace Microsoft.MixedReality.Profiling
 
             foreach (var profilerGroup in ProfilerGroups)
             {
-                profilerGroup.Start();
+                if (profilerGroup.Start())
+                {
+                    activeProfilerGroups.Add(profilerGroup);
+                }
             }
 
             BuildWindow();
@@ -804,7 +818,7 @@ namespace Microsoft.MixedReality.Profiling
                 }
 
                 // Update profiler groups
-                foreach (var profilerGroup in ProfilerGroups)
+                foreach (var profilerGroup in activeProfilerGroups)
                 {
                     if (profilerGroup.ReadyToPresent())
                     {
@@ -875,7 +889,7 @@ namespace Microsoft.MixedReality.Profiling
             BuildFrameRateStrings();
             BuildCharacterUVs();
 
-            int instanceCount = lastOffset + (maxStringLength * ProfilerGroups.Length);
+            int instanceCount = lastOffset + (maxStringLength * activeProfilerGroups.Count);
             instanceMatrices = new Matrix4x4[instanceCount];
             instanceColors = new Vector4[instanceCount];
             instanceBaseColors = new Vector4[instanceCount];
@@ -984,11 +998,11 @@ namespace Microsoft.MixedReality.Profiling
                 int offset = lastOffset;
                 float height = -0.02f;
 
-                for (int row = 0; row < ProfilerGroups.Length; row += 3)
+                for (int row = 0; row < activeProfilerGroups.Count; row += 3)
                 {
-                    for (int column = 0; (column < 3) && ((row + column) < ProfilerGroups.Length); ++column)
+                    for (int column = 0; (column < 3) && ((row + column) < activeProfilerGroups.Count); ++column)
                     {
-                        var profilerGroup = ProfilerGroups[row + column];
+                        var profilerGroup = activeProfilerGroups[row + column];
                         bool rightAlign = (column == 2) ? true : false;
 
                         // Allow for at least 8 digits other than the prefix.
