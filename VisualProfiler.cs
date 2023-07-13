@@ -59,8 +59,8 @@ namespace Microsoft.MixedReality.Profiling
         public float FrameSampleRate
         {
             get { return frameSampleRate; }
-            set 
-            { 
+            set
+            {
                 frameSampleRate = value;
                 frameSampleRateMS = frameSampleRate * 1000.0f;
             }
@@ -375,7 +375,7 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     foreach (var marker in Markers)
                     {
-                        if (marker.recorder.Valid && 
+                        if (marker.recorder.Valid &&
                             marker.recorder.Count == SampleCapacity)
                         {
                             return true;
@@ -631,7 +631,7 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        public void OnAfterDeserialize() {}
+        public void OnAfterDeserialize() { }
 
         private void LateUpdate()
         {
@@ -918,7 +918,7 @@ namespace Microsoft.MixedReality.Profiling
             Vector3 defaultWindowSize = new Vector3(0.2f, 0.04f, 1.0f);
             float edge = defaultWindowSize.x * 0.5f;
             float[] edges = new float[] { -edge, -0.03f, edge };
-  
+
             // Set the default base color.
             for (int i = 0; i < instanceBaseColors.Length; ++i)
             {
@@ -1058,7 +1058,7 @@ namespace Microsoft.MixedReality.Profiling
             string prefix = "Quality: ";
             string[] names = QualitySettings.names;
             qualityLevelStrings = new char[names.Length][];
-            
+
             for (int i = 0; i < names.Length; ++i)
             {
                 var name = prefix + names[i];
@@ -1100,7 +1100,7 @@ namespace Microsoft.MixedReality.Profiling
                 frameRateStrings[i] = ToCharArray(stringBuilder);
 
                 stringBuilder.Length = 0;
-                
+
 
                 if (i == (frameRateStrings.Length - 1))
                 {
