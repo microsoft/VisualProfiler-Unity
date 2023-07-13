@@ -576,6 +576,8 @@ namespace Microsoft.MixedReality.Profiling
             meshStatsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, displayTriangleCount ? "Triangles Count" : "Vertices Count");
 #endif
 
+            activeProfilerGroups.Clear();
+
             foreach (var profilerGroup in ProfilerGroups)
             {
                 if (profilerGroup.Start())
