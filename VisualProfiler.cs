@@ -506,9 +506,11 @@ namespace Microsoft.MixedReality.Profiling
         private float accumulatedFrameTimeGPU = 0.0f;
         private float frameSampleRateMS = 0.0f;
         private FrameTiming[] frameTimings = new FrameTiming[1];
+#if !UNITY_EDITOR
         private ProfilerRecorder batchesRecorder;
         private ProfilerRecorder drawCallsRecorder;
         private ProfilerRecorder meshStatsRecorder;
+#endif
         private List<ProfilerGroup> activeProfilerGroups = new List<ProfilerGroup>();
 
         // Rendering state.
@@ -568,9 +570,11 @@ namespace Microsoft.MixedReality.Profiling
             windowVerticalRotation = Quaternion.AngleAxis(defaultWindowRotation.x, Vector3.up);
             windowVerticalRotationInverse = Quaternion.Inverse(windowVerticalRotation);
 
+#if !UNITY_EDITOR
             batchesRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Batches Count");
             drawCallsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
             meshStatsRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Render, displayTriangleCount ? "Triangles Count" : "Vertices Count");
+#endif
 
             foreach (var profilerGroup in ProfilerGroups)
             {
@@ -603,9 +607,11 @@ namespace Microsoft.MixedReality.Profiling
                 profilerGroup.Stop();
             }
 
+#if !UNITY_EDITOR
             meshStatsRecorder.Dispose();
             drawCallsRecorder.Dispose();
             batchesRecorder.Dispose();
+#endif
         }
 
         private void OnValidate()
@@ -741,7 +747,11 @@ namespace Microsoft.MixedReality.Profiling
                 }
 
                 // Update scene statistics.
+#if UNITY_EDITOR
+                long lastBatches = UnityEditor.UnityStats.batches;
+#else
                 long lastBatches = batchesRecorder.LastValue;
+#endif
 
                 if (lastBatches != batches)
                 {
@@ -750,7 +760,11 @@ namespace Microsoft.MixedReality.Profiling
                     batches = lastBatches;
                 }
 
+#if UNITY_EDITOR
+                long lastDrawCalls = UnityEditor.UnityStats.drawCalls;
+#else
                 long lastDrawCalls = drawCallsRecorder.LastValue;
+#endif
 
                 if (lastDrawCalls != drawCalls)
                 {
@@ -759,7 +773,11 @@ namespace Microsoft.MixedReality.Profiling
                     drawCalls = lastDrawCalls;
                 }
 
+#if UNITY_EDITOR
+                long lastMeshStatsCount = displayTriangleCount ? UnityEditor.UnityStats.triangles : UnityEditor.UnityStats.vertices;
+#else
                 long lastMeshStatsCount = meshStatsRecorder.LastValue;
+#endif
 
                 if (lastMeshStatsCount != meshStatsCount)
                 {
