@@ -78,6 +78,42 @@ namespace Microsoft.MixedReality.Profiling
             set { defaultFrameRate = value; }
         }
 
+        [SerializeField, Tooltip("Table of QualitySettings.GetQualityLevel index to batches budget. When values are above this budget the text will change color.")]
+        private int[] batchesQualityLevelBudget = new int[0];
+
+        /// <summary>
+        /// Table of QualitySettings.GetQualityLevel index to batches budget. When values are above this budget the text will change color.
+        /// </summary>
+        public int[] BatchesQualityLevelBudget
+        {
+            get { return batchesQualityLevelBudget; }
+            set { batchesQualityLevelBudget = value; }
+        }
+
+        [SerializeField, Tooltip("Table of QualitySettings.GetQualityLevel index to draw calls budget. When values are above this budget the text will change color.")]
+        private int[] drawCallsQualityLevelBudget = new int[0];
+
+        /// <summary>
+        /// Table of QualitySettings.GetQualityLevel index to draw calls budget. When values are above this budget the text will change color.
+        /// </summary>
+        public int[] DrawCallsQualityLevelBudget
+        {
+            get { return drawCallsQualityLevelBudget; }
+            set { drawCallsQualityLevelBudget = value; }
+        }
+
+        [SerializeField, Tooltip("Table of QualitySettings.GetQualityLevel index to vertex (or triangle) budget. When values are above this budget the text will change color.")]
+        private int[] meshStatsQualityLevelBudget = new int[0];
+
+        /// <summary>
+        /// Table of QualitySettings.GetQualityLevel index to vertex (or triangle) budget. When values are above this budget the text will change color.
+        /// </summary>
+        public int[] MeshStatsQualityLevelBudget
+        {
+            get { return meshStatsQualityLevelBudget; }
+            set { meshStatsQualityLevelBudget = value; }
+        }
+
         [Header("Window Settings")]
         [SerializeField, Tooltip("What part of the view port to anchor the window to.")]
         private TextAnchor windowAnchor = TextAnchor.LowerCenter;
@@ -757,7 +793,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (lastBatches != batches)
                 {
-                    SceneStatsToString(stringBuffer, batchesText, lastBatches);
+                    SceneStatsToString(stringBuffer, batchesText, lastBatches, QualityLevelBudgetToColor(BatchesQualityLevelBudget, lastBatches));
 
                     batches = lastBatches;
                 }
@@ -770,7 +806,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (lastDrawCalls != drawCalls)
                 {
-                    SceneStatsToString(stringBuffer, drawCallText, lastDrawCalls);
+                    SceneStatsToString(stringBuffer, drawCallText, lastDrawCalls, QualityLevelBudgetToColor(DrawCallsQualityLevelBudget, lastDrawCalls));
 
                     drawCalls = lastDrawCalls;
                 }
@@ -785,7 +821,7 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     if (WillDisplayedMeshStatsCountDiffer(lastMeshStatsCount, meshStatsCount, displayedDecimalDigits))
                     {
-                        MeshStatsToString(stringBuffer, displayedDecimalDigits, meshText, lastMeshStatsCount);
+                        MeshStatsToString(stringBuffer, displayedDecimalDigits, meshText, lastMeshStatsCount, QualityLevelBudgetToColor(MeshStatsQualityLevelBudget, lastMeshStatsCount));
                     }
 
                     meshStatsCount = lastMeshStatsCount;
@@ -1266,7 +1302,7 @@ namespace Microsoft.MixedReality.Profiling
             SetText(data, buffer, bufferIndex, color);
         }
 
-        private void SceneStatsToString(char[] buffer, TextData data, long drawCalls)
+        private void SceneStatsToString(char[] buffer, TextData data, long drawCalls, Color color)
         {
             int bufferIndex = 0;
 
@@ -1286,10 +1322,10 @@ namespace Microsoft.MixedReality.Profiling
                 bufferIndex = ItoA((int)drawCalls, buffer, bufferIndex);
             }
 
-            SetText(data, buffer, bufferIndex, Color.white);
+            SetText(data, buffer, bufferIndex, color);
         }
 
-        private void MeshStatsToString(char[] buffer, int displayedDecimalDigits, TextData data, long count)
+        private void MeshStatsToString(char[] buffer, int displayedDecimalDigits, TextData data, long count, Color color)
         {
             int bufferIndex = 0;
 
@@ -1311,7 +1347,7 @@ namespace Microsoft.MixedReality.Profiling
 
             buffer[bufferIndex++] = usingMillions ? 'm' : 'k';
 
-            SetText(data, buffer, bufferIndex, Color.white);
+            SetText(data, buffer, bufferIndex, color);
         }
 
         private void MillisecondsToString(char[] buffer, int displayedDecimalDigits, TextData data, float milliseconds, Color color)
@@ -1338,6 +1374,18 @@ namespace Microsoft.MixedReality.Profiling
             buffer[bufferIndex++] = 's';
 
             SetText(data, buffer, bufferIndex, color);
+        }
+
+        private Color QualityLevelBudgetToColor(int[] qualityLevelBudget, long value)
+        {
+            int level = QualitySettings.GetQualityLevel();
+
+            if (qualityLevelBudget.Length > level)
+            {
+                return (value > qualityLevelBudget[level]) ? missedFrameRateColor : targetFrameRateColor;
+            }
+
+            return Color.white;
         }
 
         private static char[] ToCharArray(StringBuilder stringBuilder)
