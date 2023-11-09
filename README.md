@@ -4,7 +4,7 @@ The Visual Profiler provides a drop in solution for viewing your mixed reality U
 
 ![Visual Profiler Screenshot](README/Images/ProfilerScreenshot.png)
 
-Missed frames are displayed over time to visually find problem areas. Scene complexity is reported in the form of draw calls and rendered vertex counts (or triangle counts). Memory is reported as current, peak and max usage in a bar graph.
+Missed frames are displayed over time to visually find problem areas. Scene complexity is reported in the form of batches, draw calls, and rendered vertex counts (or triangle counts). Memory is reported as current, peak and max usage in a bar graph.
 
 > [!NOTE]
 > To ensure the profiler is minimally intrusive it does not create any GameObjects, perform any per frame managed allocations, and renders in a single draw call.
@@ -16,6 +16,7 @@ The Visual Profiler has been verified to work on the following platforms:
 - OpenXR platforms
 - Steam VR (HTC Vive / Oculus Rift)
 - Meta Quest & Quest 2
+- Windows PCs
 - WebGL
 
 ## Installation
@@ -31,7 +32,7 @@ The Visual Profiler is normally ingested as a Unity [package](https://docs.unity
 
     ![Package Manager Add](README/Images/PackageManagerAdd.png)
 	
-3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git?path=/com.microsoft.mixedreality.visualprofiler#v3.0.0* into the text field and click `"Add"`
+3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git?path=/com.microsoft.mixedreality.visualprofiler#v3.3.0* into the text field and click `"Add"`
 
     ![Package Manager Paste](README/Images/PackageManagerPaste.png)
 
