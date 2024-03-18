@@ -32,7 +32,7 @@ The Visual Profiler is normally ingested as a Unity [package](https://docs.unity
 
     ![Package Manager Add](README/Images/PackageManagerAdd.png)
 	
-3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git?path=/com.microsoft.mixedreality.visualprofiler#v3.3.0* into the text field and click `"Add"`
+3. Paste *https://github.com/microsoft/VisualProfiler-Unity.git?path=/com.microsoft.mixedreality.visualprofiler#v3.4.0* into the text field and click `"Add"`
 
     ![Package Manager Paste](README/Images/PackageManagerPaste.png)
 
@@ -40,7 +40,7 @@ The Visual Profiler is normally ingested as a Unity [package](https://docs.unity
 
 5. Finally, add the VisualProfiler component to any GameObject in the Unity scene you wish to profile. The profiler is initially active and visible (toggle-able via the IsVisible property), but can be toggled via the enabled/disable voice command keywords (on Windows/UWP platforms only).
 
-It is advised you use a specific release of the Visual Profiler package to ensure your project is locked to a stable release. Release version 3.0.0 is suggested in step three above. You can also pull another version, specific branch, or git commit hash by altering the URL as demonstrated below:
+It is advised you use a specific release of the Visual Profiler package to ensure your project is locked to a stable release. Release version 3.4.0 is suggested in step three above. You can also pull another version, specific branch, or git commit hash by altering the URL as demonstrated below:
 
 | Syntax           | URL example                                                                                                                                               |
 |------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
