@@ -284,6 +284,10 @@ namespace Microsoft.MixedReality.Profiling
                 public void Update()
                 {
                     long nextSample = recorder.LastValue;
+                    if (nextSample == 0) // ProfilerCounterValues don't update the LastValue.
+                    {
+                        nextSample = recorder.CurrentValue;
+                    }
 
                     sumOfSamples -= sampleBuffer[nextSampleIndex];
                     sumOfSamples += nextSample;
@@ -413,6 +417,17 @@ namespace Microsoft.MixedReality.Profiling
                 sum /= SampleCapacity;
 
                 return sum;
+            }
+
+            public ProfilerMarkerDataUnit GetUnitType()
+            {
+                Marker marker = Markers[0];
+                if (marker == null)
+                {
+                    return ProfilerMarkerDataUnit.Undefined;
+                }
+
+                return marker.recorder.UnitType;
             }
         }
 
@@ -911,16 +926,32 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     if (profilerGroup.ReadyToPresent())
                     {
-                        float milliseconds = profilerGroup.CalculateAverage() * 1e-6f;
-
-                        if (WillDisplayedMillisecondsDiffer(profilerGroup.LastValuePresented, milliseconds, displayedDecimalDigits))
+                        if (profilerGroup.GetUnitType() == ProfilerMarkerDataUnit.Bytes)
                         {
-                            profilerGroup.HasEverPresented = true;
-                            profilerGroup.LastValuePresented = milliseconds;
+                            float kbps = profilerGroup.CalculateAverage() / 125.0f;
 
-                            float budget = TargetFrameTime * profilerGroup.BudgetPercentage;
-                            Color color = milliseconds <= budget ? targetFrameRateColor : missedFrameRateColor;
-                            MillisecondsToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, milliseconds, color, maxStringLength);
+                            if (WillDisplayedMillisecondsDiffer(profilerGroup.LastValuePresented, kbps, displayedDecimalDigits))
+                            {
+                                profilerGroup.HasEverPresented = true;
+                                profilerGroup.LastValuePresented = kbps;
+
+                                KilobytesPerSecondToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, kbps, Color.white, maxStringLength);
+                            }
+                        }
+                        else
+                        {
+                            float milliseconds = profilerGroup.CalculateAverage() * 1e-6f;
+
+                            if (WillDisplayedMillisecondsDiffer(profilerGroup.LastValuePresented, milliseconds, displayedDecimalDigits))
+                            {
+                                profilerGroup.HasEverPresented = true;
+                                profilerGroup.LastValuePresented = milliseconds;
+
+                                float budget = TargetFrameTime * profilerGroup.BudgetPercentage;
+                                Color color = milliseconds <= budget ? targetFrameRateColor : missedFrameRateColor;
+
+                                MillisecondsToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, milliseconds, color, maxStringLength);
+                            }
                         }
                     }
                     else if (profilerGroup.HasEverPresented == false)
@@ -1461,6 +1492,34 @@ namespace Microsoft.MixedReality.Profiling
             }
 
             buffer[bufferIndex++] = 'm';
+            buffer[bufferIndex++] = 's';
+
+            SetText(data, buffer, bufferIndex, color, justifyLength);
+        }
+
+        private void KilobytesPerSecondToString(char[] buffer, int displayedDecimalDigits, TextData data, float kilobytesPerSecond, Color color, int justifyLength = 0)
+        {
+            int bufferIndex = 0;
+
+            for (int i = 0; i < data.Prefix.Length; ++i)
+            {
+                buffer[bufferIndex++] = data.Prefix[i];
+            }
+
+            if (kilobytesPerSecond >= 0.0f)
+            {
+                bufferIndex = FtoA(kilobytesPerSecond, displayedDecimalDigits, buffer, bufferIndex);
+            }
+            else
+            {
+                buffer[bufferIndex++] = '-';
+                buffer[bufferIndex++] = '.';
+                buffer[bufferIndex++] = '-';
+            }
+
+            buffer[bufferIndex++] = 'k';
+            buffer[bufferIndex++] = 'b';
+            buffer[bufferIndex++] = '/';
             buffer[bufferIndex++] = 's';
 
             SetText(data, buffer, bufferIndex, color, justifyLength);
