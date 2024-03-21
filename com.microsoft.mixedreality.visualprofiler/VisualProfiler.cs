@@ -360,7 +360,7 @@ namespace Microsoft.MixedReality.Profiling
                     switch (MarkerUnitType)
                     {
                         case ProfilerMarkerDataUnit.TimeNanoseconds: DisplayUnitSuffix = "ms"; break;
-                        case ProfilerMarkerDataUnit.Bytes: DisplayUnitSuffix = "kb/s"; break;
+                        case ProfilerMarkerDataUnit.Bytes: DisplayUnitSuffix = "kbps"; break;
                         case ProfilerMarkerDataUnit.Percent: DisplayUnitSuffix = "%"; break;
                         case ProfilerMarkerDataUnit.FrequencyHz: DisplayUnitSuffix = "hz"; break;
                         default: DisplayUnitSuffix = ""; break;
@@ -441,7 +441,7 @@ namespace Microsoft.MixedReality.Profiling
                 switch (MarkerUnitType)
                 {
                     case ProfilerMarkerDataUnit.TimeNanoseconds: return average * 1e-6f; // Milliseconds
-                    case ProfilerMarkerDataUnit.Bytes: return average / 125.0f; // Kilobytes/second
+                    case ProfilerMarkerDataUnit.Bytes: return average / 125.0f; // Kilobits/second
                     default: return average;
                 }
             }
