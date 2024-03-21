@@ -342,9 +342,8 @@ namespace Microsoft.MixedReality.Profiling
             public TextData Text { get; set; }
             public float LastValuePresented { get; set; }
             public bool HasEverPresented { get; set; }
-
-            public ProfilerMarkerDataUnit MarkerUnitType { get; private set; } = ProfilerMarkerDataUnit.Undefined;
-            public string DisplayUnitSuffix { get; private set; } = "";
+            public ProfilerMarkerDataUnit MarkerUnitType { get; private set; }
+            public string DisplayUnitSuffix { get; private set; }
 
             private bool running = false;
 
@@ -945,7 +944,7 @@ namespace Microsoft.MixedReality.Profiling
                     {
                         float value = profilerGroup.CalculateDisplayValue();
 
-                        if (WillDisplayedValueDiffer(profilerGroup.LastValuePresented, value, displayedDecimalDigits))
+                        if (WillDisplayedProfilerValueDiffer(profilerGroup.LastValuePresented, value, displayedDecimalDigits))
                         {
                             profilerGroup.HasEverPresented = true;
                             profilerGroup.LastValuePresented = value;
@@ -1507,34 +1506,6 @@ namespace Microsoft.MixedReality.Profiling
             SetText(data, buffer, bufferIndex, color, justifyLength);
         }
 
-        private void KilobytesPerSecondToString(char[] buffer, int displayedDecimalDigits, TextData data, float kilobytesPerSecond, Color color, int justifyLength = 0)
-        {
-            int bufferIndex = 0;
-
-            for (int i = 0; i < data.Prefix.Length; ++i)
-            {
-                buffer[bufferIndex++] = data.Prefix[i];
-            }
-
-            if (kilobytesPerSecond >= 0.0f)
-            {
-                bufferIndex = FtoA(kilobytesPerSecond, displayedDecimalDigits, buffer, bufferIndex);
-            }
-            else
-            {
-                buffer[bufferIndex++] = '-';
-                buffer[bufferIndex++] = '.';
-                buffer[bufferIndex++] = '-';
-            }
-
-            buffer[bufferIndex++] = 'k';
-            buffer[bufferIndex++] = 'b';
-            buffer[bufferIndex++] = '/';
-            buffer[bufferIndex++] = 's';
-
-            SetText(data, buffer, bufferIndex, color, justifyLength);
-        }
-
         private Color QualityLevelBudgetToColor(int[] qualityLevelBudget, long value)
         {
             int level = QualitySettings.GetQualityLevel();
@@ -1640,7 +1611,7 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        private static bool WillDisplayedValueDiffer(float oldValue, float newValue, int displayedDecimalDigits)
+        private static bool WillDisplayedProfilerValueDiffer(float oldValue, float newValue, int displayedDecimalDigits)
         {
             float decimalPower = Mathf.Pow(10.0f, displayedDecimalDigits);
 
