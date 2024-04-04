@@ -222,6 +222,18 @@ namespace Microsoft.MixedReality.Profiling
         private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
 
         [Header("Visual Settings")]
+        [SerializeField, Range(0, 31), Tooltip("The layer index used for rendering the profiler (range between 0, 31 inclusive). Can be used in conjuction with a camera's \"Culling Mask\" to chose which camera renders the profiler.")]
+        private int layer = 0;
+
+        /// <summary>
+        /// The layer index used for rendering the profiler (range between 0, 31 inclusive). Can be used in conjuction with a camera's \"Culling Mask\" to chose which camera renders the profiler.
+        /// </summary>
+        public int Layer
+        {
+            get { return layer; }
+            set { layer = Mathf.Clamp(value, 0, 31); }
+        }
+
         [SerializeField, Tooltip("The material to use when rendering the profiler. The material should use the \"Hidden / Visual Profiler\" shader and have a font texture.")]
         private Material material;
 
@@ -995,7 +1007,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (material != null)
                 {
-                    Graphics.DrawMeshInstanced(quadMesh, 0, material, instanceMatrices, instanceMatrices.Length, instancePropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false);
+                    Graphics.DrawMeshInstanced(quadMesh, 0, material, instanceMatrices, instanceMatrices.Length, instancePropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false, layer);
                 }
             }
             else
