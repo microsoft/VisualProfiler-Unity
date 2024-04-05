@@ -145,7 +145,7 @@ namespace Microsoft.MixedReality.Profiling
             set { windowOffset = value; }
         }
 
-        [SerializeField, Range(0.5f, 5.0f), Tooltip("Use to scale the window size up or down, can simulate a zooming effect.")]
+        [SerializeField, Range(0.5f, 10.0f), Tooltip("Use to scale the window size up or down, can simulate a zooming effect.")]
         private float windowScale = 1.0f;
 
         /// <summary>
@@ -154,7 +154,7 @@ namespace Microsoft.MixedReality.Profiling
         public float WindowScale
         {
             get { return windowScale; }
-            set { windowScale = Mathf.Clamp(value, 0.5f, 5.0f); }
+            set { windowScale = Mathf.Clamp(value, 0.5f, 10.0f); }
         }
 
         [SerializeField, Range(0.0f, 100.0f), Tooltip("How quickly to interpolate the window towards its target position and rotation.")]
@@ -179,6 +179,18 @@ namespace Microsoft.MixedReality.Profiling
         {
             get { return snapWindow; }
             set { snapWindow = value; }
+        }
+
+        [SerializeField, Tooltip("Should the window always align to the camera? (No local rotation.)")]
+        private bool alignToCamera = false;
+
+        /// <summary>
+        /// Should the window always align to the camera? (No local rotation.)
+        /// </summary>
+        public bool AlignToCamera
+        {
+            get { return alignToCamera; }
+            set { alignToCamera = value; }
         }
 
         /// <summary>
@@ -222,6 +234,18 @@ namespace Microsoft.MixedReality.Profiling
         private string[] toggleKeyworlds = new string[] { "Profiler", "Toggle Profiler", "Show Profiler", "Hide Profiler" };
 
         [Header("Visual Settings")]
+        [SerializeField, Range(0, 31), Tooltip("The layer index used for rendering the profiler (range between 0, 31 inclusive). Can be used in conjuction with a camera's \"Culling Mask\" to chose which camera renders the profiler.")]
+        private int layer = 0;
+
+        /// <summary>
+        /// The layer index used for rendering the profiler (range between 0, 31 inclusive). Can be used in conjuction with a camera's \"Culling Mask\" to chose which camera renders the profiler.
+        /// </summary>
+        public int Layer
+        {
+            get { return layer; }
+            set { layer = Mathf.Clamp(value, 0, 31); }
+        }
+
         [SerializeField, Tooltip("The material to use when rendering the profiler. The material should use the \"Hidden / Visual Profiler\" shader and have a font texture.")]
         private Material material;
 
@@ -726,9 +750,9 @@ namespace Microsoft.MixedReality.Profiling
                     else
                     {
                         float t = Time.deltaTime * windowFollowSpeed;
-                        windowPosition = Vector3.Lerp(windowPosition, CalculateWindowPosition(cameraTransform), t);
+                        windowPosition = Vector3.Lerp(windowPosition, targetPosition, t);
                         // Lerp rather than slerp for speed over quality.
-                        windowRotation = Quaternion.Lerp(windowRotation, CalculateWindowRotation(cameraTransform), t);
+                        windowRotation = Quaternion.Lerp(windowRotation, targetRotaton, t);
                     }
                 }
 
@@ -995,7 +1019,7 @@ namespace Microsoft.MixedReality.Profiling
 
                 if (material != null)
                 {
-                    Graphics.DrawMeshInstanced(quadMesh, 0, material, instanceMatrices, instanceMatrices.Length, instancePropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false);
+                    Graphics.DrawMeshInstanced(quadMesh, 0, material, instanceMatrices, instanceMatrices.Length, instancePropertyBlock, UnityEngine.Rendering.ShadowCastingMode.Off, false, layer);
                 }
             }
             else
@@ -1290,16 +1314,19 @@ namespace Microsoft.MixedReality.Profiling
         {
             Quaternion rotation = cameraTransform.rotation;
 
-            switch (windowAnchor)
+            if (!alignToCamera)
             {
-                case TextAnchor.UpperLeft: rotation *= windowHorizontalRotationInverse * windowVerticalRotationInverse; break;
-                case TextAnchor.UpperCenter: rotation *= windowHorizontalRotationInverse; break;
-                case TextAnchor.UpperRight: rotation *= windowHorizontalRotationInverse * windowVerticalRotation; break;
-                case TextAnchor.MiddleLeft: rotation *= windowVerticalRotationInverse; break;
-                case TextAnchor.MiddleRight: rotation *= windowVerticalRotation; break;
-                case TextAnchor.LowerLeft: rotation *= windowHorizontalRotation * windowVerticalRotationInverse; break;
-                case TextAnchor.LowerCenter: rotation *= windowHorizontalRotation; break;
-                case TextAnchor.LowerRight: rotation *= windowHorizontalRotation * windowVerticalRotation; break;
+                switch (windowAnchor)
+                {
+                    case TextAnchor.UpperLeft: rotation *= windowHorizontalRotationInverse * windowVerticalRotationInverse; break;
+                    case TextAnchor.UpperCenter: rotation *= windowHorizontalRotationInverse; break;
+                    case TextAnchor.UpperRight: rotation *= windowHorizontalRotationInverse * windowVerticalRotation; break;
+                    case TextAnchor.MiddleLeft: rotation *= windowVerticalRotationInverse; break;
+                    case TextAnchor.MiddleRight: rotation *= windowVerticalRotation; break;
+                    case TextAnchor.LowerLeft: rotation *= windowHorizontalRotation * windowVerticalRotationInverse; break;
+                    case TextAnchor.LowerCenter: rotation *= windowHorizontalRotation; break;
+                    case TextAnchor.LowerRight: rotation *= windowHorizontalRotation * windowVerticalRotation; break;
+                }
             }
 
             return rotation;
