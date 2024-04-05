@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-#if GT_USE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
+#if VP_USE_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
 #define USE_INPUT_SYSTEM
 #endif
 
@@ -13,7 +13,7 @@ using UnityEngine.XR;
 using UnityEngine.InputSystem;
 #endif // USE_INPUT_SYSTEM
 
-namespace Microsoft.MixedReality.GraphicsTools
+namespace Microsoft.MixedReality.Profiling.Sample
 {
     /// <summary>
     /// A simple "fly" camera for moving the camera while playing with a mouse/keyboard or gamepad.
