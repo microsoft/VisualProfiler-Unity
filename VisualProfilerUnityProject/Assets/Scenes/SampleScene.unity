@@ -989,7 +989,35 @@ MonoBehaviour:
   fontScale: {x: 0.00023, y: 0.00028}
   fontColumns: 32
   ProfilerDisplayOrder: 0
-  ProfilerGroups: []
+  ProfilerGroups:
+  - DisplayName: Behaviour
+    Markers:
+    - StatName: BehaviourUpdate
+      Operation: 0
+    - StatName: LateBehaviourUpdate
+      Operation: 0
+    - StatName: FixedBehaviourUpdate
+      Operation: 0
+    SampleCapacity: 300
+    BudgetPercentage: 1
+  - DisplayName: Render
+    Markers:
+    - StatName: Inl_UniversalRenderTotal
+      Operation: 0
+    SampleCapacity: 300
+    BudgetPercentage: 1
+  - DisplayName: Physics
+    Markers:
+    - StatName: Physics.Processing
+      Operation: 0
+    - StatName: Physics.Simulate
+      Operation: 0
+    - StatName: Physics.FetchResults
+      Operation: 0
+    - StatName: Physics.UpdateBodies
+      Operation: 0
+    SampleCapacity: 300
+    BudgetPercentage: 1
 --- !u!4 &1137945032
 Transform:
   m_ObjectHideFlags: 0
@@ -1170,7 +1198,35 @@ MonoBehaviour:
   fontScale: {x: 0.00023, y: 0.00028}
   fontColumns: 32
   ProfilerDisplayOrder: 0
-  ProfilerGroups: []
+  ProfilerGroups:
+  - DisplayName: Behaviour
+    Markers:
+    - StatName: BehaviourUpdate
+      Operation: 0
+    - StatName: LateBehaviourUpdate
+      Operation: 0
+    - StatName: FixedBehaviourUpdate
+      Operation: 0
+    SampleCapacity: 300
+    BudgetPercentage: 1
+  - DisplayName: Render
+    Markers:
+    - StatName: Inl_UniversalRenderTotal
+      Operation: 0
+    SampleCapacity: 300
+    BudgetPercentage: 1
+  - DisplayName: Physics
+    Markers:
+    - StatName: Physics.Processing
+      Operation: 0
+    - StatName: Physics.Simulate
+      Operation: 0
+    - StatName: Physics.FetchResults
+      Operation: 0
+    - StatName: Physics.UpdateBodies
+      Operation: 0
+    SampleCapacity: 300
+    BudgetPercentage: 1
 --- !u!4 &1563446977
 Transform:
   m_ObjectHideFlags: 0
