@@ -602,6 +602,7 @@ namespace Microsoft.MixedReality.Profiling
         private bool instanceColorsDirty = false;
         private bool instanceBaseColorsDirty = false;
         private bool instanceUVOffsetScaleXDirty = false;
+        private bool customUpdateInUse = false;
 
         /// <summary>
         /// Reset any stats the profiler is tracking. Call this if you would like to restart tracking 
@@ -620,6 +621,19 @@ namespace Microsoft.MixedReality.Profiling
             memoryUsage = 0;
             peakMemoryUsage = 0;
             limitMemoryUsage = 0;
+        }
+
+        /// <summary>
+        /// Allows for an app to specific a custom point in the frame to call update. (Should be called once every frame.)
+        /// </summary>
+        public void CustomUpdate()
+        {
+            customUpdateInUse = true;
+
+            if (isActiveAndEnabled)
+            {
+                InternalUpdate();
+            }
         }
 
         private void OnEnable()
@@ -724,6 +738,14 @@ namespace Microsoft.MixedReality.Profiling
         public void OnAfterDeserialize() { }
 
         private void LateUpdate()
+        {
+            if (customUpdateInUse == false)
+            {
+                InternalUpdate();
+            }
+        }
+
+        private void InternalUpdate()
         {
 #if ENABLE_PROFILER
             foreach (var profilerGroup in ProfilerGroups)
