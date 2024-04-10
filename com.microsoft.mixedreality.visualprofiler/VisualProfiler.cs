@@ -284,6 +284,10 @@ namespace Microsoft.MixedReality.Profiling
                 public void Update()
                 {
                     long nextSample = recorder.LastValue;
+                    if (nextSample == 0) // ProfilerCounterValue doesn't update the LastValue.
+                    {
+                        nextSample = recorder.CurrentValue;
+                    }
 
                     sumOfSamples -= sampleBuffer[nextSampleIndex];
                     sumOfSamples += nextSample;
@@ -338,6 +342,8 @@ namespace Microsoft.MixedReality.Profiling
             public TextData Text { get; set; }
             public float LastValuePresented { get; set; }
             public bool HasEverPresented { get; set; }
+            public ProfilerMarkerDataUnit MarkerUnitType { get; private set; }
+            public string DisplayUnitSuffix { get; private set; }
 
             private bool running = false;
 
@@ -346,6 +352,19 @@ namespace Microsoft.MixedReality.Profiling
                 foreach (var marker in Markers)
                 {
                     marker.Init(SampleCapacity);
+                }
+
+                if (Markers[0] != null)
+                {
+                    MarkerUnitType = Markers[0].recorder.UnitType;
+                    switch (MarkerUnitType)
+                    {
+                        case ProfilerMarkerDataUnit.TimeNanoseconds: DisplayUnitSuffix = "ms"; break;
+                        case ProfilerMarkerDataUnit.Bytes: DisplayUnitSuffix = "kbps"; break;
+                        case ProfilerMarkerDataUnit.Percent: DisplayUnitSuffix = "%"; break;
+                        case ProfilerMarkerDataUnit.FrequencyHz: DisplayUnitSuffix = "hz"; break;
+                        default: DisplayUnitSuffix = ""; break;
+                    }
                 }
 
                 running = true;
@@ -413,6 +432,18 @@ namespace Microsoft.MixedReality.Profiling
                 sum /= SampleCapacity;
 
                 return sum;
+            }
+
+            public float CalculateDisplayValue()
+            {
+                float average = CalculateAverage();
+
+                switch (MarkerUnitType)
+                {
+                    case ProfilerMarkerDataUnit.TimeNanoseconds: return average * 1e-6f; // Milliseconds
+                    case ProfilerMarkerDataUnit.Bytes: return average / 125.0f; // Kilobits/second
+                    default: return average;
+                }
             }
         }
 
@@ -911,16 +942,23 @@ namespace Microsoft.MixedReality.Profiling
                 {
                     if (profilerGroup.ReadyToPresent())
                     {
-                        float milliseconds = profilerGroup.CalculateAverage() * 1e-6f;
+                        float value = profilerGroup.CalculateDisplayValue();
 
-                        if (WillDisplayedMillisecondsDiffer(profilerGroup.LastValuePresented, milliseconds, displayedDecimalDigits))
+                        if (WillDisplayedProfilerValueDiffer(profilerGroup.LastValuePresented, value, displayedDecimalDigits))
                         {
                             profilerGroup.HasEverPresented = true;
-                            profilerGroup.LastValuePresented = milliseconds;
+                            profilerGroup.LastValuePresented = value;
 
-                            float budget = TargetFrameTime * profilerGroup.BudgetPercentage;
-                            Color color = milliseconds <= budget ? targetFrameRateColor : missedFrameRateColor;
-                            MillisecondsToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, milliseconds, color, maxStringLength);
+                            Color color = Color.white;
+
+                            // Only apply frame time budget coloring to time profilers
+                            if (profilerGroup.MarkerUnitType == ProfilerMarkerDataUnit.TimeNanoseconds)
+                            {
+                                float budget = TargetFrameTime * profilerGroup.BudgetPercentage;
+                                color = value <= budget ? targetFrameRateColor : missedFrameRateColor;
+                            }
+
+                            ProfilerValueToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, value, profilerGroup.DisplayUnitSuffix, color, maxStringLength);
                         }
                     }
                     else if (profilerGroup.HasEverPresented == false)
@@ -928,7 +966,7 @@ namespace Microsoft.MixedReality.Profiling
                         profilerGroup.HasEverPresented = true;
                         profilerGroup.LastValuePresented = -1.0f;
 
-                        MillisecondsToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, -1.0f, Color.white, maxStringLength);
+                        ProfilerValueToString(stringBuffer, displayedDecimalDigits, profilerGroup.Text, -1.0f, profilerGroup.DisplayUnitSuffix, Color.white, maxStringLength);
                     }
                 }
 #endif
@@ -1440,7 +1478,7 @@ namespace Microsoft.MixedReality.Profiling
             SetText(data, buffer, bufferIndex, color, justifyLength);
         }
 
-        private void MillisecondsToString(char[] buffer, int displayedDecimalDigits, TextData data, float milliseconds, Color color, int justifyLength = 0)
+        private void ProfilerValueToString(char[] buffer, int displayedDecimalDigits, TextData data, float value, string unitSuffix, Color color, int justifyLength = 0)
         {
             int bufferIndex = 0;
 
@@ -1449,9 +1487,9 @@ namespace Microsoft.MixedReality.Profiling
                 buffer[bufferIndex++] = data.Prefix[i];
             }
 
-            if (milliseconds >= 0.0f)
+            if (value >= 0.0f)
             {
-                bufferIndex = FtoA(milliseconds, displayedDecimalDigits, buffer, bufferIndex);
+                bufferIndex = FtoA(value, displayedDecimalDigits, buffer, bufferIndex);
             }
             else
             {
@@ -1460,8 +1498,10 @@ namespace Microsoft.MixedReality.Profiling
                 buffer[bufferIndex++] = '-';
             }
 
-            buffer[bufferIndex++] = 'm';
-            buffer[bufferIndex++] = 's';
+            foreach (char c in unitSuffix)
+            {
+                buffer[bufferIndex++] = c;
+            }
 
             SetText(data, buffer, bufferIndex, color, justifyLength);
         }
@@ -1571,11 +1611,11 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        private static bool WillDisplayedMillisecondsDiffer(float oldMilliseconds, float newMilliseconds, int displayedDecimalDigits)
+        private static bool WillDisplayedProfilerValueDiffer(float oldValue, float newValue, int displayedDecimalDigits)
         {
             float decimalPower = Mathf.Pow(10.0f, displayedDecimalDigits);
 
-            return (int)(oldMilliseconds * decimalPower) != (int)(newMilliseconds * decimalPower);
+            return (int)(oldValue * decimalPower) != (int)(newValue * decimalPower);
         }
 
         private static bool WillDisplayedMeshStatsCountDiffer(long oldCount, long newCount, int displayedDecimalDigits)
