@@ -1,0 +1,20 @@
+{
+    "name": "Microsoft.MixedReality.Profiling.Sample",
+    "rootNamespace": "Microsoft.MixedReality.Profiling.Sample",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.4.0",
+            "define": "VP_USE_INPUT_SYSTEM"
+        }
+    ],
+    "noEngineReferences": false
+}
