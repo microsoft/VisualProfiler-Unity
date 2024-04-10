@@ -69,7 +69,7 @@ Custom profilers can be added to the bottom of the Visual Profiler by adding to 
 
 ## Sample
 
-A sample Unity project can be found in the *VisualProfilerUnityProject* folder. This project contains a simple sample scene that demonstrates the visual profiler being used in 3D and 2D (perspective and orthographic cameras) plus example profiler groups for C# behaviors, rendering, and physics.
+A sample Unity project can be found in the *VisualProfilerUnityProject* folder. This project contains a simple sample scene that demonstrates the Visual Profiler being used in 3D and 2D (perspective and orthographic cameras) plus example profiler groups for C# behaviors, rendering, and physics.
 
 ![Sample](README/Images/Sample.png)
 
