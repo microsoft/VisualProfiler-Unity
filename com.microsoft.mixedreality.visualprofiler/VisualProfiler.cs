@@ -66,7 +66,7 @@ namespace Microsoft.MixedReality.Profiling
             }
         }
 
-        [SerializeField, Tooltip("What frame rate should the app target if one cannot be determined by the XR device.")]
+        [SerializeField, Min(0.0f), Tooltip("What frame rate should the app target if one cannot be determined by the XR device.")]
         private float defaultFrameRate = 60.0f;
 
         /// <summary>
@@ -75,7 +75,19 @@ namespace Microsoft.MixedReality.Profiling
         public float DefaultFrameRate
         {
             get { return defaultFrameRate; }
-            set { defaultFrameRate = value; }
+            set { defaultFrameRate = Mathf.Max(value, 0.0f); }
+        }
+
+        [SerializeField, Range(0.0f, 1.0f), Tooltip("A missed frame is considered when the frame rate is less than the target frame rate times the missed frame percentage.")]
+        private float missedFramePercentage = 0.9f;
+
+        /// <summary>
+        /// A missed frame is considered when the frame rate is less than the target frame rate times the missed frame percentage."
+        /// </summary>
+        public float MissedFramePercentage
+        {
+            get { return missedFramePercentage; }
+            set { missedFramePercentage = Mathf.Clamp01(value); }
         }
 
         [SerializeField, Range(0, 2), Tooltip("How many decimal places to display on numeric strings.")]
@@ -829,7 +841,7 @@ namespace Microsoft.MixedReality.Profiling
                     int lastGpuFrameRate = Mathf.Min(Mathf.RoundToInt(SmoothGpuFrameRate), maxTargetFrameRate);
 
                     // TODO - [Cameron-Micka] Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
-                    bool missedFrame = lastCpuFrameRate < ((int)(TargetFrameRate) - 1);
+                    bool missedFrame = lastCpuFrameRate < (int)(TargetFrameRate * MissedFramePercentage);
                     Color frameColor = missedFrame ? missedFrameRateColor : targetFrameRateColor;
                     Vector4 frameIcon = missedFrame ? characterUVs['X'] : characterUVs[' '];
 
