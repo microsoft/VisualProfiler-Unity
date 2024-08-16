@@ -205,6 +205,18 @@ namespace Microsoft.MixedReality.Profiling
             set { alignToCamera = value; }
         }
 
+        [SerializeField, Tooltip("If specified, the profiler window will follow this transform instead of the main camera.")]
+        private Transform transformToFollow = null;
+
+        /// <summary>
+        /// If specified, the profiler window will follow this transform instead of the main camera.
+        /// </summary>
+        public Transform TransformToFollow
+        {
+            get { return transformToFollow; }
+            set { transformToFollow = value; }
+        }
+
         /// <summary>
         /// Access the CPU frame rate (in frames per second).
         /// </summary>
@@ -841,7 +853,7 @@ namespace Microsoft.MixedReality.Profiling
                     int lastGpuFrameRate = Mathf.Min(Mathf.RoundToInt(SmoothGpuFrameRate), maxTargetFrameRate);
 
                     // TODO - [Cameron-Micka] Ideally we would query a device specific API (like the HolographicFramePresentationReport) to detect missed frames.
-                    bool missedFrame = lastCpuFrameRate < (int)(TargetFrameRate * MissedFramePercentage);
+                    bool missedFrame = lastCpuFrameRate < (int)(TargetFrameRate * missedFramePercentage);
                     Color frameColor = missedFrame ? missedFrameRateColor : targetFrameRateColor;
                     Vector4 frameIcon = missedFrame ? characterUVs['X'] : characterUVs[' '];
 
@@ -1329,8 +1341,18 @@ namespace Microsoft.MixedReality.Profiling
 
         private Vector3 CalculateWindowPosition(Transform cameraTransform)
         {
-            float windowDistance = Mathf.Max(16.0f / Camera.main.fieldOfView, Camera.main.nearClipPlane + 0.25f);
-            Vector3 position = cameraTransform.position + (cameraTransform.forward * windowDistance);
+            Vector3 position;
+
+            if (transformToFollow != null)
+            {
+                position = transformToFollow.position;
+            }
+            else
+            {
+                float windowDistance = Mathf.Max(16.0f / Camera.main.fieldOfView, Camera.main.nearClipPlane + 0.25f);
+                position = cameraTransform.position + (cameraTransform.forward * windowDistance);
+            }
+
             Vector3 horizontalOffset = cameraTransform.right * windowOffset.x;
             Vector3 verticalOffset = cameraTransform.up * windowOffset.y;
 
