@@ -591,6 +591,7 @@ namespace Microsoft.MixedReality.Profiling
         private ProfilerRecorder meshStatsRecorder;
 #endif
         private Recorder[] srpBatchesRecorders;
+        private ProfilerRecorder systemUsedMemoryRecorder;
 
         // Rendering state.
         private Mesh quadMesh;
@@ -688,6 +689,8 @@ namespace Microsoft.MixedReality.Profiling
             }
 #endif
 
+            systemUsedMemoryRecorder = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "System Used Memory");
+
             BuildWindow();
 
 #if UNITY_STANDALONE_WIN || UNITY_WSA
@@ -705,6 +708,8 @@ namespace Microsoft.MixedReality.Profiling
                 keywordRecognizer = null;
             }
 #endif
+
+            systemUsedMemoryRecorder.Dispose();
 
             foreach (var profilerGroup in ProfilerGroups)
             {
@@ -1636,14 +1641,17 @@ namespace Microsoft.MixedReality.Profiling
             return bufferIndex;
         }
 
-        private static ulong AppMemoryUsage
+        private ulong AppMemoryUsage
         {
             get
             {
 #if WINDOWS_UWP
                 return MemoryManager.AppMemoryUsage;
 #else
-                return (ulong)Profiler.GetTotalAllocatedMemoryLong();
+                // Profiler.GetTotalAllocatedMemoryLong() could also be used here, but that only returns the total memory allocated
+                // by the internal allocators in Unity - so we don't get the whole picture of memory usage. "System Used Memory" will
+                // return the "working set" of the process which is similar to what Task Manager displays in Windows.
+                return (ulong)systemUsedMemoryRecorder.LastValue;
 #endif
             }
         }
