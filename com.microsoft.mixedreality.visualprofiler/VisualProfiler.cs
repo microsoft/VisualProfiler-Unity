@@ -1682,10 +1682,11 @@ namespace Microsoft.MixedReality.Profiling
 #if WINDOWS_UWP
                 return MemoryManager.AppMemoryUsage;
 #else
-                // Profiler.GetTotalAllocatedMemoryLong() could also be used here, but that only returns the total memory allocated
-                // by the internal allocators in Unity - so we don't get the whole picture of memory usage. "System Used Memory" will
-                // return the "working set" of the process which is similar to what Task Manager displays in Windows.
-                return (ulong)systemUsedMemoryRecorder.LastValue;
+                // "System Used Memory" will return the "working set" of the process which is similar to what Task Manager displays
+                // in Windows. But this is not available on all platforms (like WebGL) so instead return Profiler.GetTotalReservedMemoryLong()
+                // which is the total memory Unity has reserved for current and future allocations.
+                var usedMemory = (ulong)systemUsedMemoryRecorder.LastValue;
+                return (usedMemory != 0) ? usedMemory : (ulong)Profiler.GetTotalReservedMemoryLong();
 #endif
             }
         }
