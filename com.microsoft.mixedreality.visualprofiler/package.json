@@ -1,6 +1,6 @@
 {
   "name": "com.microsoft.mixedreality.visualprofiler",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "displayName": "Microsoft Mixed Reality Visual Profiler",
   "description": "Provides a drop in solution for viewing your mixed reality Unity application's frame rate, scene complexity, and memory usage.",
   "documentationUrl": "https://github.com/microsoft/VisualProfiler-Unity/blob/main/README.md",
