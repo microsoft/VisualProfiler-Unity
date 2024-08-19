@@ -1280,17 +1280,17 @@ namespace Microsoft.MixedReality.Profiling
             StringBuilder stringBuilder = new StringBuilder(32);
             StringBuilder milisecondStringBuilder = new StringBuilder(16);
 
-            for (int i = 0; i < frameRateStrings.Length; ++i)
-            {
-                float miliseconds = (i == 0) ? 0.0f : (1.0f / i) * 1000.0f;
-                milisecondStringBuilder.AppendFormat(displayedDecimalFormat, miliseconds);
-                string frame = "-", ms = "-.-";
+            // Display nothing for index zero.
+            frameRateStrings[0] = ToCharArray(stringBuilder);
+            gpuFrameRateStrings[0] = ToCharArray(stringBuilder);
 
-                if (i != 0)
-                {
-                    frame = i.ToString();
-                    ms = milisecondStringBuilder.ToString();
-                }
+            for (int i = 1; i < frameRateStrings.Length; ++i)
+            {
+                float milliseconds = (i == 0) ? 0.0f : (1.0f / i) * 1000.0f;
+                milisecondStringBuilder.AppendFormat(displayedDecimalFormat, milliseconds);
+
+                string frame = i.ToString();
+                string ms = milisecondStringBuilder.ToString();
 
                 if (i == (frameRateStrings.Length - 1))
                 {
@@ -1304,7 +1304,6 @@ namespace Microsoft.MixedReality.Profiling
                 frameRateStrings[i] = ToCharArray(stringBuilder);
 
                 stringBuilder.Length = 0;
-
 
                 if (i == (frameRateStrings.Length - 1))
                 {
